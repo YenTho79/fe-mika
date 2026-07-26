@@ -1,0 +1,43 @@
+NỘI DUNG FE ĐÃ THỰC HIỆN
+
+Vai trò: Frontend
+Thành viên: Nguyễn Thị Yến Thơ
+Dự án: App đọc sách online - Mika Books
+
+Các màn hình đã chuyển sang mobile:
+1. Đăng nhập
+2. Đăng ký
+3. Trang chủ
+4. Truyện nổi bật / khám phá
+5. Sách mới
+6. Tin tức
+7. Chi tiết truyện
+8. Nạp xu
+9. Thanh toán
+10. Thanh toán thành công
+11. Chia sẻ truyện
+12. Xem trước thẻ chia sẻ
+13. Tài khoản cá nhân
+
+Chức năng FE demo:
+- Đăng nhập giả lập bằng AsyncStorage
+- Đăng ký giả lập
+- Hiển thị tên/email tài khoản
+- Tìm kiếm truyện
+- Lọc truyện theo thể loại
+- Xem chi tiết truyện
+- Lưu/bỏ lưu truyện
+- Danh sách chương, chương khóa chuyển sang nạp xu
+- Chọn gói nạp xu
+- Chọn phương thức thanh toán
+- Thanh toán thành công
+- Chia sẻ truyện demo
+- Đăng xuất
+
+Công nghệ sử dụng:
+- React Native
+- Expo
+- Expo Router
+- AsyncStorage
+- JavaScript
+

@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "name": "Mika Books",
+    "slug": "Mika-books-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "mikabooks",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "ios": { "supportsTablet": true },
+    "android": { "adaptiveIcon": { "backgroundColor": "#0b1326" } },
+    "plugins": ["expo-router"],
+    "experiments": { "typedRoutes": true }
+  }
+}
