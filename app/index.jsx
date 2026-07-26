@@ -1,18 +1,25 @@
 import { useEffect } from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors } from '../constants/theme';
+import { getCurrentUser, initLocalData } from '../services/localDataService';
 
 export default function Index() {
   const router = useRouter();
-  useEffect(() => {
-    async function checkLogin() {
-      const user = await AsyncStorage.getItem('mika_user');
-      router.replace(user ? '/trang-chu' : '/dang-nhap');
-    }
-    checkLogin();
-  }, []);
 
-  return <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={colors.primary} /></View>;
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      await initLocalData();
+      const user = await getCurrentUser();
+      if (active) router.replace(user ? (user.role === 'admin' ? '/admin' : '/trang-chu') : '/dang-nhap');
+    })();
+    return () => { active = false; };
+  }, [router]);
+
+  return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background }}>
+      <ActivityIndicator size="large" color={colors.primary} />
+    </View>
+  );
 }

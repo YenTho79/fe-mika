@@ -1,659 +1,274 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { Image, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import {
-  ScrollView,
-  View,
-  Text,
-  Image,
-  ImageBackground,
-  Pressable,
-  StyleSheet,
-  ActivityIndicator,
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-
-import { BottomNav, Button, Screen, SectionTitle } from '../components/UI';
-import { books as localBooks } from '../data/books';
-import { colors, shadow } from '../constants/theme';
-import { fetchStories, getImageUrl } from '../constants/api';
-
-const MIKA_LOGO_URL = 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?q=80&w=200&auto=format&fit=crop';
+  BookCard,
+  BottomNav,
+  EmptyState,
+  ErrorState,
+  LoadingSkeleton,
+  Screen,
+  SectionHeader,
+} from '../components/UI';
+import { colors, radius, spacing, typography } from '../constants/theme';
+import {
+  getArticles,
+  getAdminSettings,
+  getChapters,
+  getCurrentUser,
+  getReadingProgressList,
+  restoreDemoContent,
+} from '../services/localDataService';
+import { useLocalBooks } from '../hooks/useLocalBooks';
 
 export default function Home() {
   const router = useRouter();
-  const [allBooks, setAllBooks] = useState(localBooks);
-  const [loading, setLoading] = useState(true);
+  const { width } = useWindowDimensions();
+  const bannerWidth = Math.max(280, Math.min(width - spacing.xl * 2, 720));
+  const carouselRef = useRef(null);
+  const { books, loading, error, reload } = useLocalBooks();
+  const [user, setUser] = useState(null);
+  const [articles, setArticles] = useState([]);
+  const [chapters, setChapters] = useState([]);
+  const [progressItems, setProgressItems] = useState([]);
+  const [activeBanner, setActiveBanner] = useState(0);
+  const [restoring, setRestoring] = useState(false);
+  const [adminSettings, setAdminSettings] = useState({ appName: 'Mika Books', bannerTitle: 'ĐỀ XUẤT HÔM NAY', bannerSubtitle: '' });
 
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const res = await fetchStories();
-        if (res.success && Array.isArray(res.results) && res.results.length > 0) {
-          const mapped = res.results.map((s) => ({
-            id: s.id,
-            title: s.tieu_de,
-            author: s.tac_gia,
-            category: Array.isArray(s.the_loai) && s.the_loai.length > 0 ? s.the_loai[0] : 'Kỳ ảo',
-            rating: s.diem_danh_gia || 4.8,
-            chapters: s.so_chuong || 0,
-            views: typeof s.luot_doc === 'number'
-              ? (s.luot_doc >= 1000000 ? `${(s.luot_doc / 1000000).toFixed(1)}M` : s.luot_doc >= 1000 ? `${(s.luot_doc / 1000).toFixed(1)}K` : `${s.luot_doc}`)
-              : (s.luot_doc || '0'),
-            status: s.trang_thai || 'Đang ra',
-            cover: getImageUrl(s.anh_bia_url),
-            description: s.mo_ta || ''
-          }));
-          setAllBooks(mapped);
-        }
-      } catch (err) {
-        console.log('Error fetching stories on home:', err);
-      } finally {
-        setLoading(false);
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    getCurrentUser().then(async (currentUser) => {
+      const [localArticles, localChapters, localProgress, localAdminSettings] = await Promise.all([
+        getArticles(),
+        getChapters(),
+        currentUser ? getReadingProgressList(currentUser.id) : [],
+        getAdminSettings(),
+      ]);
+      if (active) {
+        setUser(currentUser);
+        setArticles(localArticles);
+        setChapters(localChapters);
+        setProgressItems(localProgress);
+        setAdminSettings(localAdminSettings);
       }
-    }
-    loadData();
-  }, []);
+    }).catch((loadError) => console.error('Không thể nạp trang chủ:', loadError));
+    return () => { active = false; };
+  }, []));
 
-  const hero = allBooks[0] || localBooks[0];
-  const readingBooks = allBooks.slice(1, 4).length > 0 ? allBooks.slice(1, 4) : localBooks.slice(1, 4);
-  const featuredBooks = allBooks.slice(0, 4);
-  const newBooks = allBooks.slice(0, 3);
+  const featured = useMemo(() => books.filter((book) => book.featured).slice(0, 6), [books]);
+  const banners = (featured.length ? featured : books).slice(0, 3);
+  const newest = useMemo(
+    () => [...books].sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt)).slice(0, 6),
+    [books]
+  );
+  const latestArticles = useMemo(
+    () => [...articles].filter((item) => item.status === 'published').sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt)).slice(0, 3),
+    [articles]
+  );
+  const reading = progressItems.map((progress) => ({
+    progress,
+    book: books.find((book) => String(book.id) === String(progress.bookId)),
+    chapter: chapters.find((chapter) => String(chapter.id) === String(progress.chapterId)),
+  })).filter((item) => item.book);
+  const readCategories = new Set(reading.flatMap(({ book }) => book.categories || [book.category]).filter(Boolean));
+  const recommendations = books
+    .filter((book) => !reading.some((item) => String(item.book.id) === String(book.id)))
+    .filter((book) => !readCategories.size || (book.categories || [book.category]).some((category) => readCategories.has(category)))
+    .slice(0, 6);
+
+  const openBook = (book) => router.push({ pathname: '/chi-tiet', params: { id: book.id } });
+  const openReader = ({ book, chapter }) => router.push({
+    pathname: '/doc-sach',
+    params: { bookId: book.id, ...(chapter ? { chapter: chapter.id } : {}) },
+  });
+  const restoreData = async () => {
+    setRestoring(true);
+    try {
+      await restoreDemoContent();
+      await reload();
+    } finally {
+      setRestoring(false);
+    }
+  };
 
   return (
     <Screen padded={false}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.container}
-      >
-        {/* Thanh điều hướng trên */}
-        <View style={styles.topBar}>
-          <View style={styles.brandRow}>
-            <Image source={{ uri: MIKA_LOGO_URL }} style={styles.avatar} />
-            <Text style={styles.brand}>Mika Books</Text>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.topRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.eyebrow}>{adminSettings.appName.toLocaleUpperCase('vi-VN')}</Text>
+            <Text style={styles.greeting}>Xin chào, {user?.name?.split(' ').at(-1) || 'độc giả'}</Text>
           </View>
-
-          <Pressable
-            onPress={() => router.push('/noi-bat')}
-            style={styles.searchButton}
-          >
-            <Ionicons name="search" size={22} color={colors.primary} />
+          <Pressable accessibilityLabel="Tìm kiếm" onPress={() => router.push('/tim-kiem')} style={styles.headerButton}>
+            <Ionicons name="search" size={21} color={colors.primary} />
+          </Pressable>
+          <Pressable accessibilityLabel="Tài khoản" onPress={() => router.push('/tai-khoan')} style={styles.avatar}>
+            {user?.avatar ? <Image source={{ uri: user.avatar }} style={styles.avatarImage} /> : <Ionicons name="person" size={22} color={colors.primary} />}
           </Pressable>
         </View>
 
-        {/* Banner nổi bật */}
-        <Pressable onPress={() => router.push({ pathname: '/chi-tiet', params: { id: hero.id } })}>
-          <ImageBackground
-            source={{ uri: hero.cover }}
-            imageStyle={styles.heroImage}
-            style={styles.hero}
-          >
-            <View style={styles.heroOverlay}>
-              <Text style={styles.badge}>HOT NHẤT THÁNG</Text>
-
-              <Text style={styles.heroTitle}>
-                {hero.title}
-              </Text>
-
-              <Text style={styles.heroDesc} numberOfLines={2}>
-                {hero.description || 'Khám phá vũ trụ rộng lớn cùng thợ săn tiền thưởng Kaelen.'}
-              </Text>
-
-              <View style={styles.heroActions}>
-                <Button
-                  title="Đọc ngay"
-                  icon="book"
-                  onPress={() => router.push({ pathname: '/chi-tiet', params: { id: hero.id } })}
-                  style={styles.heroButton}
-                />
-
-                <Button
-                  title="Chi tiết"
-                  variant="outline"
-                  onPress={() => router.push({ pathname: '/chi-tiet', params: { id: hero.id } })}
-                  style={styles.heroButton}
-                />
-              </View>
-            </View>
-          </ImageBackground>
+        <Pressable onPress={() => router.push('/tim-kiem')} style={styles.searchPrompt}>
+          <Ionicons name="search" size={20} color={colors.outline} />
+          <Text style={styles.searchPromptText}>Tìm theo truyện, tác giả hoặc thể loại...</Text>
         </Pressable>
 
-        {/* Truyện đang đọc */}
-        <View style={styles.sectionHeader}>
-          <View>
-            <Text style={styles.sectionTitle}>Truyện đang đọc</Text>
-            <Text style={styles.sectionSub}>Tiếp tục hành trình của bạn</Text>
+        {loading ? (
+          <View style={styles.loadingBlock}>
+            <LoadingSkeleton height={220} borderRadius={radius.xl} />
+            <LoadingSkeleton width="55%" height={24} />
+            <LoadingSkeleton height={140} />
           </View>
-
-          <Pressable onPress={() => router.push('/tai-khoan')}>
-            <Text style={styles.sectionAction}>Xem lịch sử</Text>
-          </Pressable>
-        </View>
-
-        <View style={{ marginHorizontal: -20, marginBottom: 8 }}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.readingList}
-          >
-            {readingBooks.map((book, index) => (
-              <Pressable
-                key={book.id}
-                style={styles.readingCard}
-                onPress={() => router.push({ pathname: '/chi-tiet', params: { id: book.id } })}
-              >
-                <Image source={{ uri: book.cover }} style={styles.readingCover} />
-
-                <View style={styles.readingInfo}>
-                  <Text style={styles.readingTitle} numberOfLines={1}>
-                    {book.title}
-                  </Text>
-
-                  <Text style={styles.readingChapter}>
-                    Chương {index === 0 ? '124/500' : index === 1 ? '12/45' : '89/100'}
-                  </Text>
-
-                  <View style={styles.progressBg}>
-                    <View
-                      style={[
-                        styles.progressFill,
-                        { width: index === 0 ? '25%' : index === 1 ? '78%' : '89%' },
-                      ]}
-                    />
+        ) : error ? (
+          <ErrorState message={error} onRetry={reload} />
+        ) : books.length === 0 ? (
+          <EmptyState
+            icon="library-outline"
+            title="Thư viện đang trống"
+            message="Dữ liệu truyện demo đã bị xóa khỏi thiết bị. Bạn có thể khôi phục ngay."
+            actionTitle={restoring ? 'Đang khôi phục...' : 'Khôi phục dữ liệu demo'}
+            onAction={restoring ? undefined : restoreData}
+          />
+        ) : (
+          <>
+            <ScrollView
+              ref={carouselRef}
+              horizontal
+              pagingEnabled
+              snapToInterval={bannerWidth}
+              decelerationRate="fast"
+              showsHorizontalScrollIndicator={false}
+              onMomentumScrollEnd={(event) => setActiveBanner(Math.round(event.nativeEvent.contentOffset.x / bannerWidth))}
+              style={styles.carousel}
+            >
+              {banners.map((book, index) => (
+                <Pressable key={book.id} onPress={() => openBook(book)} style={[styles.hero, { width: bannerWidth }]}>
+                  <Image source={{ uri: book.cover }} style={styles.heroImage} />
+                  <View style={styles.heroShade} />
+                  <View style={styles.heroText}>
+                    <Text style={styles.heroLabel}>{index === 0 ? adminSettings.bannerTitle.toLocaleUpperCase('vi-VN') : 'NỔI BẬT TRÊN MIKA'}</Text>
+                    <Text style={styles.heroTitle} numberOfLines={2}>{book.title}</Text>
+                    <Text style={styles.heroMeta} numberOfLines={1}>{index === 0 && adminSettings.bannerSubtitle ? adminSettings.bannerSubtitle : `${book.author}  •  ${book.rating} ★`}</Text>
                   </View>
+                </Pressable>
+              ))}
+            </ScrollView>
+            {banners.length > 1 ? (
+              <View style={styles.dots}>
+                {banners.map((book, index) => <View key={book.id} style={[styles.dot, activeBanner === index && styles.dotActive]} />)}
+              </View>
+            ) : null}
+
+            <SectionHeader title="Đang đọc" subtitle={reading.length ? 'Tiếp tục từ chương gần nhất' : 'Hành trình của bạn sẽ xuất hiện ở đây'} />
+            {reading.length ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {reading.map((item) => (
+                  <Pressable key={item.book.id} onPress={() => openReader(item)} style={styles.continueCard}>
+                    <Image source={{ uri: item.book.cover }} style={styles.continueCover} />
+                    <View style={styles.continueInfo}>
+                      <Text style={styles.continueTitle} numberOfLines={2}>{item.book.title}</Text>
+                      <Text style={styles.continueChapter} numberOfLines={1}>
+                        {item.chapter ? `Chương ${item.chapter.number}: ${item.chapter.title}` : 'Chương gần nhất'}
+                      </Text>
+                      <View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${Math.min(100, Math.max(0, item.progress.percent || 0))}%` }]} /></View>
+                      <Text style={styles.progressText}>{item.progress.percent || 0}% đã đọc</Text>
+                    </View>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            ) : (
+              <Pressable onPress={() => router.push('/kham-pha')} style={styles.discoveryInvite}>
+                <View style={styles.discoveryIcon}><Ionicons name="compass-outline" size={26} color={colors.primary} /></View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.discoveryTitle}>Chưa có lịch sử đọc</Text>
+                  <Text style={styles.discoveryText}>Khám phá kho truyện và bắt đầu cuốn sách đầu tiên.</Text>
                 </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.primary} />
               </Pressable>
-            ))}
-          </ScrollView>
-        </View>
+            )}
 
-        {/* Truyện nổi bật và Sách mới */}
-        <View style={styles.featuredHeader}>
-          <Text style={styles.sectionTitle}>Truyện nổi bật</Text>
+            <SectionHeader title="Truyện nổi bật" action="Xem tất cả" onPress={() => router.push('/noi-bat')} />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {(featured.length ? featured : books.slice(0, 6)).map((book) => <BookCard key={book.id} book={book} onPress={() => openBook(book)} />)}
+            </ScrollView>
 
-          <Pressable
-            style={styles.seeAllRow}
-            onPress={() => router.push('/noi-bat')}
-          >
-            <Text style={styles.sectionAction}>Xem tất cả</Text>
-            <Ionicons name="chevron-forward" size={16} color={colors.primary} />
-          </Pressable>
-        </View>
+            <SectionHeader title="Sách mới cập nhật" action="Xem tất cả" onPress={() => router.push('/sach-moi')} />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {newest.map((book) => <BookCard key={book.id} book={book} onPress={() => openBook(book)} />)}
+            </ScrollView>
 
-        <View style={styles.bookGrid}>
-          {featuredBooks.map((book, index) => (
-            <Pressable
-              key={book.id}
-              style={styles.bookItem}
-              onPress={() => router.push({ pathname: '/chi-tiet', params: { id: book.id } })}
-            >
-              <View style={styles.bookCoverWrap}>
-                <Image source={{ uri: book.cover }} style={styles.bookCover} />
+            {recommendations.length ? (
+              <>
+                <SectionHeader
+                  title="Có thể bạn sẽ thích"
+                  subtitle={readCategories.size ? `Dựa trên ${[...readCategories].slice(0, 2).join(', ')}` : 'Lựa chọn phổ biến cho bạn'}
+                />
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  {recommendations.map((book) => <BookCard key={book.id} book={book} onPress={() => openBook(book)} />)}
+                </ScrollView>
+              </>
+            ) : null}
 
-                {index === 0 && (
-                  <View style={styles.ratingBadge}>
-                    <Text style={styles.ratingText}>{book.rating || '9.8'}</Text>
-                  </View>
-                )}
-              </View>
-
-              <Text style={styles.bookTitle} numberOfLines={1}>
-                {book.title}
-              </Text>
-
-              <Text style={styles.bookMeta} numberOfLines={1}>
-                {book.category || 'Kỳ ảo'} • {book.views || '1.2M'} lượt đọc
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-
-        {/* Sách mới */}
-        <View style={styles.featuredHeader}>
-          <Text style={styles.sectionTitle}>Sách mới</Text>
-
-          <Pressable onPress={() => router.push('/sach-moi')}>
-            <Text style={styles.sectionAction}>Xem hết</Text>
-          </Pressable>
-        </View>
-
-        <View style={styles.newBookList}>
-          {newBooks.map((book, index) => (
-            <Pressable
-              key={book.id}
-              style={styles.newBookItem}
-              onPress={() => router.push({ pathname: '/chi-tiet', params: { id: book.id } })}
-            >
-              <Image source={{ uri: book.cover }} style={styles.newBookCover} />
-
-              <View style={styles.newBookText}>
-                <Text style={styles.newBookTitle} numberOfLines={1}>
-                  {book.title}
-                </Text>
-
-                <Text style={styles.newBookMeta}>
-                  {book.category || 'Mới'} • Tác giả: {book.author}
-                </Text>
-              </View>
-            </Pressable>
-          ))}
-        </View>
-
-
-        {/* Bài báo mới nhất */}
-        <View style={styles.featuredHeader}>
-          <Text style={styles.sectionTitle}>Bài báo mới nhất</Text>
-
-          <Pressable onPress={() => router.push('/tin-tuc')}>
-            <Text style={styles.sectionAction}>Khám phá blog</Text>
-          </Pressable>
-        </View>
-
-        <View style={styles.articleList}>
-          <Pressable onPress={() => router.push('/tin-tuc')} style={styles.articleCard}>
-            <Image source={{ uri: hero.cover }} style={styles.articleImage} />
-
-            <View style={styles.articleContent}>
-              <View style={styles.articleTagRow}>
-                <View style={styles.tagLine} />
-                <Text style={styles.articleTag}>XU HƯỚNG</Text>
-              </View>
-
-              <Text style={styles.articleTitle} numberOfLines={2}>
-                Văn hóa đọc trong kỷ nguyên AI: Những thay đổi đáng kinh ngạc
-              </Text>
-
-              <Text style={styles.articleDesc} numberOfLines={3}>
-                Trí tuệ nhân tạo đang thay đổi cách chúng ta tiếp cận và tiêu
-                thụ nội dung chữ viết như thế nào...
-              </Text>
-
-              <View style={styles.articleFooter}>
-                <Text style={styles.articleMeta}>Admin • 15 phút đọc</Text>
-                <MaterialIcons name="bookmark-border" size={18} color={colors.muted} />
-              </View>
-            </View>
-          </Pressable>
-
-          <Pressable onPress={() => router.push('/tin-tuc')} style={styles.articleCard}>
-            <Image source={{ uri: allBooks[1]?.cover || hero.cover }} style={styles.articleImage} />
-
-            <View style={styles.articleContent}>
-              <View style={styles.articleTagRow}>
-                <View style={[styles.tagLine, { backgroundColor: colors.primary }]} />
-                <Text style={[styles.articleTag, { color: colors.primary }]}>TÁC GIẢ</Text>
-              </View>
-
-              <Text style={styles.articleTitle} numberOfLines={2}>
-                Phỏng vấn độc quyền: Tương lai của dòng truyện Kỳ Ảo Việt
-              </Text>
-
-              <Text style={styles.articleDesc} numberOfLines={3}>
-                Lắng nghe những chia sẻ từ các tác giả hàng đầu về thị trường
-                truyện chữ đang bùng nổ...
-              </Text>
-
-              <View style={styles.articleFooter}>
-                <Text style={styles.articleMeta}>Lucy Nguyen • 8 phút đọc</Text>
-                <MaterialIcons name="bookmark" size={18} color={colors.primary} />
-              </View>
-            </View>
-          </Pressable>
-        </View>
+            {latestArticles.length ? (
+              <>
+                <SectionHeader title="Bài viết mới nhất" action="Xem tất cả" onPress={() => router.push('/tin-tuc')} />
+                {latestArticles.map((article) => (
+                  <Pressable key={article.id} onPress={() => router.push({ pathname: '/tin-tuc', params: { id: article.id } })} style={styles.article}>
+                    <Image source={{ uri: article.image }} style={styles.articleImage} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.articleCategory}>{article.category}</Text>
+                      <Text style={styles.articleTitle} numberOfLines={2}>{article.title}</Text>
+                      <Text style={styles.articleSummary} numberOfLines={2}>{article.summary}</Text>
+                    </View>
+                  </Pressable>
+                ))}
+              </>
+            ) : null}
+          </>
+        )}
       </ScrollView>
-
       <BottomNav router={router} active="home" />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 120,
-  },
-
-  topBar: {
-    height: 56,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 18,
-  },
-
-  brandRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-
-  avatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    borderWidth: 2,
-    borderColor: colors.primaryContainer,
-  },
-
-  brand: {
-    color: colors.primary,
-    fontSize: 24,
-    fontWeight: '900',
-  },
-
-  searchButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  hero: {
-    height: 430,
-    borderRadius: 28,
-    overflow: 'hidden',
-    justifyContent: 'flex-end',
-    marginBottom: 34,
-    ...shadow,
-  },
-
-  heroImage: {
-    borderRadius: 28,
-  },
-
-  heroOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    padding: 24,
-    backgroundColor: 'rgba(11,19,38,0.45)',
-  },
-
-  badge: {
-    alignSelf: 'flex-start',
-    color: '#ede0ff',
-    backgroundColor: colors.primaryContainer,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 999,
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-    marginBottom: 14,
-  },
-
-  heroTitle: {
-    color: colors.white,
-    fontSize: 29,
-    fontWeight: '900',
-    lineHeight: 36,
-  },
-
-  heroDesc: {
-    color: colors.muted,
-    fontSize: 15,
-    lineHeight: 23,
-    marginTop: 10,
-    marginBottom: 20,
-  },
-
-  heroActions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-
-  heroButton: {
-    flex: 1,
-  },
-
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    marginBottom: 16,
-  },
-
-  sectionTitle: {
-    color: colors.text,
-    fontSize: 23,
-    fontWeight: '800',
-  },
-
-  sectionSub: {
-    color: colors.muted,
-    marginTop: 4,
-    fontSize: 13,
-  },
-
-  sectionAction: {
-    color: colors.primary,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-
-  readingList: {
-    gap: 14,
-    paddingBottom: 8,
-    paddingHorizontal: 20,
-  },
-
-  readingCard: {
-    width: 280,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    padding: 12,
-    borderRadius: 20,
-    backgroundColor: 'rgba(30,41,59,0.72)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-  },
-
-  readingCover: {
-    width: 78,
-    height: 110,
-    borderRadius: 12,
-  },
-
-  readingInfo: {
-    flex: 1,
-  },
-
-  readingTitle: {
-    color: colors.text,
-    fontSize: 15,
-    fontWeight: '800',
-  },
-
-  readingChapter: {
-    color: colors.muted,
-    fontSize: 12,
-    marginTop: 6,
-    marginBottom: 12,
-  },
-
-  progressBg: {
-    height: 5,
-    borderRadius: 999,
-    backgroundColor: colors.surfaceHigh || '#2d3449',
-    overflow: 'hidden',
-  },
-
-  progressFill: {
-    height: '100%',
-    backgroundColor: colors.primary,
-    borderRadius: 999,
-  },
-
-  featuredHeader: {
-    marginTop: 28,
-    marginBottom: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-
-  seeAllRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-  },
-
-  bookGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    rowGap: 16,
-  },
-
-  bookItem: {
-    width: '48%',
-  },
-
-  bookCoverWrap: {
-    aspectRatio: 3 / 4,
-    borderRadius: 18,
-    overflow: 'hidden',
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
-  },
-
-  bookCover: {
-    width: '100%',
-    height: '100%',
-  },
-
-  ratingBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-    backgroundColor: 'rgba(0,0,0,0.65)',
-  },
-
-  ratingText: {
-    color: colors.tertiary || '#4edea3',
-    fontSize: 11,
-    fontWeight: '900',
-  },
-
-  bookTitle: {
-    color: colors.text,
-    fontSize: 15,
-    fontWeight: '800',
-    marginTop: 9,
-  },
-
-  bookMeta: {
-    color: colors.muted,
-    fontSize: 12,
-    marginTop: 3,
-  },
-
-  newBookList: {
-    gap: 12,
-  },
-
-  newBookItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    padding: 10,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.03)',
-  },
-
-  newBookCover: {
-    width: 58,
-    height: 82,
-    borderRadius: 11,
-  },
-
-  newBookText: {
-    flex: 1,
-  },
-
-  newBookTitle: {
-    color: colors.text,
-    fontSize: 15,
-    fontWeight: '800',
-  },
-
-  newBookMeta: {
-    color: colors.muted,
-    marginTop: 6,
-    fontSize: 12,
-  },
-
-  articleList: {
-    gap: 18,
-  },
-
-  articleCard: {
-    borderRadius: 24,
-    overflow: 'hidden',
-    backgroundColor: 'rgba(30,41,59,0.72)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-  },
-
-  articleImage: {
-    width: '100%',
-    height: 170,
-  },
-
-  articleContent: {
-    padding: 18,
-  },
-
-  articleTagRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 10,
-  },
-
-  tagLine: {
-    width: 4,
-    height: 18,
-    borderRadius: 99,
-    backgroundColor: colors.tertiary || '#4edea3',
-  },
-
-  articleTag: {
-    color: colors.tertiary || '#4edea3',
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-  },
-
-  articleTitle: {
-    color: colors.text,
-    fontSize: 20,
-    lineHeight: 27,
-    fontWeight: '900',
-  },
-
-  articleDesc: {
-    color: colors.muted,
-    fontSize: 14,
-    lineHeight: 22,
-    marginTop: 10,
-  },
-
-  articleFooter: {
-    marginTop: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-
-  articleMeta: {
-    color: colors.muted,
-    fontSize: 12,
-  },
+  content: { padding: spacing.xl, paddingBottom: 110 },
+  topRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.lg },
+  eyebrow: { ...typography.caption, color: colors.primary, fontWeight: '900', letterSpacing: 1 },
+  greeting: { ...typography.heading, color: colors.text, marginTop: spacing.xs },
+  headerButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center' },
+  avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  avatarImage: { width: '100%', height: '100%' },
+  searchPrompt: { height: 50, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.lg, borderRadius: radius.round, backgroundColor: colors.surface2 },
+  searchPromptText: { ...typography.body, color: colors.outline, flex: 1 },
+  loadingBlock: { gap: spacing.md, marginTop: spacing.xxl },
+  carousel: { marginTop: spacing.xl, borderRadius: radius.xl },
+  hero: { height: 220, borderRadius: radius.xl, overflow: 'hidden', backgroundColor: colors.surface },
+  heroImage: { width: '100%', height: '100%' },
+  heroShade: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(7,11,21,0.28)' },
+  heroText: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: spacing.xl, backgroundColor: 'rgba(7,11,21,0.78)' },
+  heroLabel: { ...typography.caption, color: colors.tertiary, fontWeight: '900' },
+  heroTitle: { ...typography.heading, color: colors.white, marginTop: spacing.xs },
+  heroMeta: { ...typography.body, color: colors.primary, marginTop: spacing.xs },
+  dots: { flexDirection: 'row', alignSelf: 'center', gap: spacing.xs, marginTop: spacing.sm },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.surface3 },
+  dotActive: { width: 20, backgroundColor: colors.primary },
+  continueCard: { width: 300, minHeight: 142, flexDirection: 'row', borderRadius: radius.lg, padding: spacing.md, marginRight: spacing.md, backgroundColor: colors.surface },
+  continueCover: { width: 78, height: 112, borderRadius: radius.sm },
+  continueInfo: { flex: 1, marginLeft: spacing.md, justifyContent: 'center' },
+  continueTitle: { ...typography.title, color: colors.text },
+  continueChapter: { ...typography.caption, color: colors.muted, marginTop: spacing.sm },
+  progressTrack: { height: 6, borderRadius: 3, backgroundColor: colors.surface3, overflow: 'hidden', marginTop: spacing.lg },
+  progressFill: { height: '100%', borderRadius: 3, backgroundColor: colors.tertiary },
+  progressText: { ...typography.caption, color: colors.tertiary, fontWeight: '700', marginTop: spacing.xs },
+  discoveryInvite: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surface, padding: spacing.lg, borderRadius: radius.lg },
+  discoveryIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface3 },
+  discoveryTitle: { ...typography.title, color: colors.text },
+  discoveryText: { ...typography.caption, color: colors.muted, marginTop: spacing.xs },
+  article: { flexDirection: 'row', gap: spacing.md, backgroundColor: colors.surface, padding: spacing.md, borderRadius: radius.lg, marginBottom: spacing.md },
+  articleImage: { width: 100, height: 100, borderRadius: radius.md },
+  articleCategory: { ...typography.caption, color: colors.tertiary, fontWeight: '800' },
+  articleTitle: { ...typography.title, color: colors.text, marginTop: spacing.xs },
+  articleSummary: { ...typography.caption, color: colors.muted, marginTop: spacing.xs },
 });

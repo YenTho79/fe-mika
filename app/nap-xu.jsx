@@ -1,66 +1,106 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ScrollView, View, Text, Pressable, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Button, Card, Header, Screen } from '../components/UI';
+import { Button, Card, Header, LoadingSkeleton, Screen } from '../components/UI';
 import { coinPackages } from '../data/books';
-import { colors } from '../constants/theme';
+import { colors, radius, spacing, typography } from '../constants/theme';
+import { getCurrentUser } from '../services/localDataService';
+
+const paymentMethods = [
+  { id: 'MoMo', icon: 'phone-portrait-outline', color: '#a50064' },
+  { id: 'ZaloPay', icon: 'flash-outline', color: '#1677ff' },
+  { id: 'ATM / Visa', icon: 'card-outline', color: '#0a8f68' },
+];
+
+const parsePrice = (price) => Number(String(price).replace(/[^0-9]/g, '')) || 0;
 
 export default function Topup() {
   const router = useRouter();
+  const params = useLocalSearchParams();
   const [selected, setSelected] = useState(2);
   const [method, setMethod] = useState('MoMo');
-  const pack = coinPackages.find(p => p.id === selected);
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const pack = coinPackages.find((item) => item.id === selected) || coinPackages[0];
+
+  useFocusEffect(useCallback(() => {
+    setLoading(true);
+    getCurrentUser().then(setUser).finally(() => setLoading(false));
+  }, []));
+
+  const continuePayment = () => router.push({
+    pathname: '/thanh-toan',
+    params: {
+      coin: pack.coin,
+      bonus: pack.bonus,
+      price: parsePrice(pack.price),
+      priceLabel: pack.price,
+      method,
+      returnBookId: params.returnBookId || '',
+      returnChapterId: params.returnChapterId || '',
+    },
+  });
 
   return (
     <Screen padded={false} safeAreaTop={false}>
-      <Header title="Nạp xu" onBack={() => router.back()} />
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+      <Header title="Nạp xu" onBack={() => router.back()} rightIcon="receipt-outline" onRight={() => router.push('/lich-su-giao-dich')} />
+      <ScrollView contentContainerStyle={styles.content}>
         <Card style={styles.balance}>
           <View>
             <Text style={styles.muted}>Số dư hiện tại</Text>
-            <Text style={styles.balanceText}>500 Xu</Text>
+            {loading ? <LoadingSkeleton width={120} height={34} style={{ marginTop: spacing.xs }} /> : <Text style={styles.balanceText}>{Number(user?.coinBalance || 0).toLocaleString('vi-VN')} Xu</Text>}
           </View>
-          <Ionicons name="wallet" size={34} color={colors.primary} />
+          <View style={styles.wallet}><Ionicons name="wallet" size={30} color={colors.primary} /></View>
         </Card>
 
         <Text style={styles.section}>Chọn gói nạp</Text>
-        {coinPackages.map(p => (
-          <Pressable key={p.id} onPress={() => setSelected(p.id)} style={[styles.package, selected === p.id && styles.packageActive]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <Ionicons name={p.id === 3 ? 'diamond' : 'cash'} size={24} color={selected === p.id ? '#fff' : colors.primary} />
+        {coinPackages.map((item) => (
+          <Pressable key={item.id} onPress={() => setSelected(item.id)} style={[styles.package, selected === item.id && styles.packageActive]}>
+            <View style={styles.packageInfo}>
+              <Ionicons name={item.bonus ? 'sparkles' : 'cash-outline'} size={24} color={selected === item.id ? colors.white : colors.primary} />
               <View>
-                <Text style={[styles.packageTitle, selected === p.id && styles.activeText]}>{p.coin} Xu {p.bonus ? `+${p.bonus}` : ''}</Text>
-                <Text style={[styles.muted, selected === p.id && { color: 'rgba(255,255,255,0.8)' }]}>{p.bonus ? `Tặng thêm ${Math.round(p.bonus / p.coin * 100)}%` : 'Gói cơ bản'}</Text>
+                <Text style={[styles.packageTitle, selected === item.id && styles.activeText]}>{item.coin.toLocaleString('vi-VN')} Xu {item.bonus ? `+ ${item.bonus}` : ''}</Text>
+                <Text style={[styles.muted, selected === item.id && styles.activeMuted]}>{item.bonus ? `Tặng thêm ${Math.round(item.bonus / item.coin * 100)}%` : 'Gói cơ bản'}</Text>
               </View>
             </View>
-            <Text style={[styles.price, selected === p.id && styles.activeText]}>{p.price}</Text>
+            <Text style={[styles.price, selected === item.id && styles.activeText]}>{item.price}</Text>
           </Pressable>
         ))}
 
         <Text style={styles.section}>Phương thức thanh toán</Text>
-        {['MoMo','ZaloPay','ATM / Visa'].map(m => (
-          <Pressable key={m} onPress={() => setMethod(m)} style={styles.method}>
-            <Text style={styles.packageTitle}>{m}</Text>
-            <Ionicons name={method === m ? 'radio-button-on' : 'radio-button-off'} color={colors.primary} size={24} />
+        {paymentMethods.map((item) => (
+          <Pressable key={item.id} onPress={() => setMethod(item.id)} style={[styles.method, method === item.id && styles.methodActive]}>
+            <View style={[styles.methodIcon, { backgroundColor: item.color }]}><Ionicons name={item.icon} color={colors.white} size={21} /></View>
+            <Text style={styles.packageTitle}>{item.id}</Text>
+            <Ionicons name={method === item.id ? 'radio-button-on' : 'radio-button-off'} color={colors.primary} size={24} />
           </Pressable>
         ))}
 
-        <Button title={`Tiếp tục thanh toán ${pack?.price || ''}`} icon="chevron-forward" onPress={() => router.push({ pathname: '/thanh-toan', params: { coin: pack.coin, bonus: pack.bonus, price: pack.price, method } })} style={{ marginTop: 24 }} />
+        <Button title={`Tiếp tục · ${pack.price}`} icon="chevron-forward" onPress={continuePayment} style={{ marginTop: spacing.xxl }} />
+        <Pressable onPress={() => router.push('/lich-su-giao-dich')} style={styles.historyLink}><Ionicons name="time-outline" size={18} color={colors.primary} /><Text style={styles.historyText}>Xem lịch sử giao dịch</Text></Pressable>
       </ScrollView>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  content: { padding: spacing.xl, paddingBottom: spacing.xxxl },
   balance: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  muted: { color: colors.muted },
-  balanceText: { color: colors.text, fontSize: 26, fontWeight: '900', marginTop: 4 },
-  section: { color: colors.text, fontSize: 22, fontWeight: '900', marginTop: 26, marginBottom: 12 },
-  package: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.surface, padding: 16, borderRadius: 18, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
-  packageActive: { backgroundColor: colors.primaryContainer, borderColor: colors.primary, transform: [{ scale: 1.01 }] },
-  packageTitle: { color: colors.text, fontSize: 18, fontWeight: '900' },
-  price: { color: colors.primary, fontWeight: '900', fontSize: 17 },
-  activeText: { color: '#fff' },
-  method: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.surface, padding: 16, borderRadius: 18, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }
+  wallet: { width: 54, height: 54, borderRadius: 27, backgroundColor: 'rgba(124,58,237,0.2)', alignItems: 'center', justifyContent: 'center' },
+  muted: { ...typography.caption, color: colors.muted },
+  balanceText: { color: colors.text, fontSize: 26, fontWeight: '900', marginTop: spacing.xs },
+  section: { ...typography.heading, color: colors.text, marginTop: spacing.xxl, marginBottom: spacing.md },
+  package: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.surface, padding: spacing.lg, borderRadius: radius.lg, marginBottom: spacing.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  packageActive: { backgroundColor: colors.primaryContainer, borderColor: colors.primary },
+  packageInfo: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  packageTitle: { color: colors.text, fontSize: 17, fontWeight: '900' },
+  price: { color: colors.primary, fontWeight: '900', fontSize: 16 },
+  activeText: { color: colors.white },
+  activeMuted: { color: 'rgba(255,255,255,0.78)' },
+  method: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surface, padding: spacing.lg, borderRadius: radius.lg, marginBottom: spacing.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  methodActive: { borderColor: colors.primary },
+  methodIcon: { width: 38, height: 38, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
+  historyLink: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: spacing.sm, padding: spacing.lg },
+  historyText: { ...typography.body, color: colors.primary, fontWeight: '800' },
 });

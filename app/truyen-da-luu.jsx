@@ -1,250 +1,214 @@
-import { useState, useCallback } from 'react';
-import { ScrollView, View, Text, Image, Pressable, StyleSheet, Alert } from 'react-native';
-import { useRouter, useFocusEffect } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useCallback, useMemo, useState } from 'react';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Header, Screen, Card } from '../components/UI';
-import { books } from '../data/books';
-import { colors, shadow } from '../constants/theme';
+import {
+  AppHeader,
+  ConfirmDialog,
+  EmptyState,
+  FilterChip,
+  LoadingSkeleton,
+  Screen,
+  SearchField,
+} from '../components/UI';
+import { colors, radius, spacing, typography } from '../constants/theme';
+import {
+  getBooks,
+  getChapters,
+  getCurrentUser,
+  getReadingProgressList,
+  getSavedBooks,
+  toggleSaveBook,
+} from '../services/localDataService';
 
-export default function SavedBooks() {
+const tabs = [
+  { id: 'saved', label: 'Đã lưu', icon: 'bookmark-outline' },
+  { id: 'reading', label: 'Đang đọc', icon: 'book-outline' },
+  { id: 'completed', label: 'Đã đọc xong', icon: 'checkmark-circle-outline' },
+];
+const sortOptions = [
+  { id: 'saved', label: 'Mới lưu' },
+  { id: 'read', label: 'Mới đọc' },
+  { id: 'name', label: 'Tên truyện' },
+];
+
+export default function Library() {
   const router = useRouter();
-  const [savedBooks, setSavedBooks] = useState([]);
+  const [books, setBooks] = useState([]);
+  const [chapters, setChapters] = useState([]);
+  const [savedIds, setSavedIds] = useState(new Set());
+  const [progressList, setProgressList] = useState([]);
+  const [user, setUser] = useState(null);
+  const [tab, setTab] = useState('saved');
+  const [sort, setSort] = useState('saved');
+  const [keyword, setKeyword] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [removeTarget, setRemoveTarget] = useState(null);
 
-  // Load saved books
-  const loadSavedBooks = async () => {
-    try {
-      const savedData = await AsyncStorage.getItem('mika_saved_books');
-      if (savedData) {
-        const savedIds = JSON.parse(savedData);
-        // Filter books from books database that match the saved IDs
-        const filteredBooks = books.filter(b => savedIds.includes(b.id));
-        setSavedBooks(filteredBooks);
-      } else {
-        setSavedBooks([]);
-      }
-    } catch (error) {
-      console.log('Error loading saved books', error);
+  const load = useCallback(async () => {
+    setLoading(true);
+    const currentUser = await getCurrentUser();
+    setUser(currentUser);
+    if (currentUser) {
+      const [allBooks, allChapters, savedBooks, progressItems] = await Promise.all([
+        getBooks(),
+        getChapters(),
+        getSavedBooks(currentUser.id),
+        getReadingProgressList(currentUser.id),
+      ]);
+      const savedMap = new Map(savedBooks.map((book) => [String(book.id), book.savedAt]));
+      setBooks(allBooks.map((book) => ({ ...book, savedAt: savedMap.get(String(book.id)) })));
+      setChapters(allChapters);
+      setSavedIds(new Set(savedBooks.map((book) => String(book.id))));
+      setProgressList(progressItems);
+    }
+    setLoading(false);
+  }, []);
+
+  useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  const visibleItems = useMemo(() => {
+    const progressMap = new Map(progressList.map((item) => [String(item.bookId), item]));
+    const normalizedKeyword = keyword.trim().toLocaleLowerCase('vi');
+    let items = books.map((book) => ({
+      book,
+      progress: progressMap.get(String(book.id)) || null,
+      chapter: chapters.find((chapter) => String(chapter.id) === String(progressMap.get(String(book.id))?.chapterId)) || null,
+    }));
+
+    if (tab === 'saved') items = items.filter(({ book }) => savedIds.has(String(book.id)));
+    if (tab === 'reading') items = items.filter(({ progress }) => progress && Number(progress.percent || 0) < 100);
+    if (tab === 'completed') items = items.filter(({ progress }) => Number(progress?.percent || 0) >= 100);
+    if (normalizedKeyword) {
+      items = items.filter(({ book }) => `${book.title} ${book.author}`.toLocaleLowerCase('vi').includes(normalizedKeyword));
+    }
+
+    return items.sort((a, b) => {
+      if (sort === 'name') return a.book.title.localeCompare(b.book.title, 'vi');
+      if (sort === 'read') return new Date(b.progress?.updatedAt || 0) - new Date(a.progress?.updatedAt || 0);
+      return new Date(b.book.savedAt || 0) - new Date(a.book.savedAt || 0);
+    });
+  }, [books, chapters, keyword, progressList, savedIds, sort, tab]);
+
+  const openItem = ({ book, chapter }) => {
+    if (chapter) {
+      router.push({ pathname: '/doc-sach', params: { bookId: book.id, chapter: chapter.id } });
+    } else {
+      router.push({ pathname: '/chi-tiet', params: { id: book.id } });
     }
   };
 
-  // Reload data every time this screen is focused
-  useFocusEffect(
-    useCallback(() => {
-      loadSavedBooks();
-    }, [])
-  );
-
-  // Remove book from saved list
-  const removeBook = async (book) => {
-    try {
-      const savedData = await AsyncStorage.getItem('mika_saved_books');
-      if (savedData) {
-        let savedList = JSON.parse(savedData);
-        savedList = savedList.filter(id => id !== book.id);
-        await AsyncStorage.setItem('mika_saved_books', JSON.stringify(savedList));
-        Alert.alert('Thành công', `Đã bỏ lưu truyện "${book.title}"`);
-        loadSavedBooks(); // Refresh list
-      }
-    } catch (error) {
-      console.log('Error removing book', error);
-    }
+  const removeSavedBook = async () => {
+    if (!removeTarget || !user) return;
+    await toggleSaveBook(user.id, removeTarget.id);
+    setSavedIds((current) => {
+      const next = new Set(current);
+      next.delete(String(removeTarget.id));
+      return next;
+    });
+    setRemoveTarget(null);
   };
+
+  const emptyCopy = {
+    saved: ['bookmark-outline', 'Chưa có truyện đã lưu', 'Lưu truyện yêu thích để tìm lại nhanh hơn.'],
+    reading: ['book-outline', 'Chưa đọc truyện nào', 'Bắt đầu một truyện và tiến độ sẽ xuất hiện tại đây.'],
+    completed: ['checkmark-circle-outline', 'Chưa hoàn thành truyện', 'Những truyện đọc đến cuối sẽ được lưu tại đây.'],
+  }[tab];
 
   return (
     <Screen padded={false} safeAreaTop={false}>
-      <Header title="Truyện đã lưu" onBack={() => router.back()} />
-      
-      {savedBooks.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <View style={styles.emptyIconContainer}>
-            <Ionicons name="bookmark-outline" size={60} color={colors.outline} />
-          </View>
-          <Text style={styles.emptyText}>Danh sách truyện lưu trống</Text>
-          <Text style={styles.emptySubtext}>Hãy khám phá những tác phẩm hấp dẫn và lưu lại tại đây nhé.</Text>
-          <Pressable 
-            style={styles.exploreBtn} 
-            onPress={() => router.replace('/trang-chu')}
-          >
-            <Text style={styles.exploreBtnText}>Khám phá ngay</Text>
-            <Ionicons name="compass-outline" size={18} color="#ede0ff" />
-          </Pressable>
+      <AppHeader title="Tủ sách của tôi" onBack={() => router.back()} />
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <View style={styles.tabs}>
+          {tabs.map((item) => (
+            <FilterChip
+              key={item.id}
+              label={item.label}
+              icon={item.icon}
+              active={tab === item.id}
+              onPress={() => setTab(item.id)}
+            />
+          ))}
         </View>
-      ) : (
-        <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-          <Text style={styles.countText}>Bạn đã lưu {savedBooks.length} cuốn truyện</Text>
-          
-          {savedBooks.map(book => (
-            <Card key={book.id} style={styles.bookCard}>
-              <Pressable 
-                style={styles.bookPressArea}
-                onPress={() => router.push({ pathname: '/chi-tiet', params: { id: book.id } })}
-              >
-                <Image source={{ uri: book.cover }} style={styles.bookCover} />
-                
-                <View style={styles.bookInfo}>
-                  <Text style={styles.bookTitle} numberOfLines={1}>{book.title}</Text>
-                  <Text style={styles.bookAuthor}>{book.author}</Text>
-                  
-                  <View style={styles.metaRow}>
-                    <Text style={styles.metaText}>{book.category}</Text>
-                    <Text style={styles.dot}>•</Text>
-                    <Text style={styles.metaText}>{book.status}</Text>
-                  </View>
-                  
-                  <View style={styles.ratingRow}>
-                    <Ionicons name="star" size={14} color={colors.primary} />
-                    <Text style={styles.ratingText}>{book.rating}</Text>
-                    <Text style={styles.dot}>•</Text>
-                    <Text style={styles.viewsText}>{book.views} lượt đọc</Text>
-                  </View>
-                </View>
-              </Pressable>
-
-              <Pressable 
-                style={styles.deleteButton} 
-                onPress={() => removeBook(book)}
-              >
-                <Ionicons name="bookmark" size={24} color={colors.primary} />
-              </Pressable>
-            </Card>
+        <SearchField value={keyword} onChangeText={setKeyword} placeholder="Tìm trong tủ sách..." style={styles.search} />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sorts}>
+          <Text style={styles.sortLabel}>Sắp xếp:</Text>
+          {sortOptions.map((item) => (
+            <FilterChip key={item.id} label={item.label} active={sort === item.id} onPress={() => setSort(item.id)} />
           ))}
         </ScrollView>
-      )}
+
+        {loading ? [1, 2, 3].map((item) => <LoadingSkeleton key={item} height={128} style={{ marginBottom: spacing.md }} />) : null}
+        {!loading && visibleItems.map((item) => (
+          <LibraryItem
+            key={item.book.id}
+            {...item}
+            isSaved={savedIds.has(String(item.book.id))}
+            onPress={() => openItem(item)}
+            onRemove={() => setRemoveTarget(item.book)}
+          />
+        ))}
+        {!loading && visibleItems.length === 0 ? (
+          <EmptyState
+            icon={keyword ? 'search-outline' : emptyCopy[0]}
+            title={keyword ? 'Không tìm thấy truyện' : emptyCopy[1]}
+            message={keyword ? 'Thử tìm bằng tên truyện hoặc tác giả khác.' : emptyCopy[2]}
+            actionTitle={!keyword && tab === 'saved' ? 'Khám phá truyện' : undefined}
+            onAction={() => router.replace('/kham-pha')}
+          />
+        ) : null}
+      </ScrollView>
+      <ConfirmDialog
+        visible={Boolean(removeTarget)}
+        title="Bỏ lưu truyện?"
+        message={`“${removeTarget?.title || ''}” sẽ bị xóa khỏi tab Đã lưu. Lịch sử đọc vẫn được giữ lại.`}
+        confirmText="Bỏ lưu"
+        onConfirm={removeSavedBook}
+        onCancel={() => setRemoveTarget(null)}
+        isDanger
+      />
     </Screen>
   );
 }
 
+function LibraryItem({ book, chapter, progress, isSaved, onPress, onRemove }) {
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.item, pressed && { opacity: 0.8 }]}>
+      <Image source={{ uri: book.cover }} style={styles.cover} />
+      <View style={styles.itemInfo}>
+        <View style={styles.itemTitleRow}>
+          <Text style={styles.itemTitle} numberOfLines={2}>{book.title}</Text>
+          {isSaved ? (
+            <Pressable accessibilityLabel="Bỏ lưu truyện" onPress={onRemove} hitSlop={10}>
+              <Ionicons name="bookmark" size={21} color={colors.primary} />
+            </Pressable>
+          ) : null}
+        </View>
+        <Text style={styles.chapterText} numberOfLines={1}>
+          {chapter ? `Chương ${chapter.number}: ${chapter.title}` : 'Chưa bắt đầu đọc'}
+        </Text>
+        <View style={styles.progressTrack}>
+          <View style={[styles.progressFill, { width: `${progress?.percent || 0}%` }]} />
+        </View>
+        <Text style={styles.progressText}>{progress?.percent || 0}% đã đọc</Text>
+      </View>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
-  scrollContainer: {
-    padding: 20,
-    paddingBottom: 40
-  },
-  countText: {
-    color: colors.outline,
-    fontWeight: '700',
-    fontSize: 14,
-    marginBottom: 16,
-    textTransform: 'uppercase'
-  },
-  bookCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    marginBottom: 14,
-    backgroundColor: colors.surface,
-    borderColor: 'rgba(255,255,255,0.06)'
-  },
-  bookPressArea: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14
-  },
-  bookCover: {
-    width: 80,
-    height: 112,
-    borderRadius: 12,
-    backgroundColor: colors.surface3
-  },
-  bookInfo: {
-    flex: 1,
-    justifyContent: 'center'
-  },
-  bookTitle: {
-    color: colors.text,
-    fontSize: 17,
-    fontWeight: '900',
-    marginBottom: 4
-  },
-  bookAuthor: {
-    color: colors.primary,
-    fontSize: 13,
-    fontWeight: '700',
-    marginBottom: 6
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 6
-  },
-  metaText: {
-    color: colors.outline,
-    fontSize: 12,
-    fontWeight: '700'
-  },
-  dot: {
-    color: 'rgba(255,255,255,0.15)',
-    fontSize: 12
-  },
-  ratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4
-  },
-  ratingText: {
-    color: colors.primary,
-    fontWeight: '800',
-    fontSize: 13
-  },
-  viewsText: {
-    color: colors.muted,
-    fontSize: 12,
-    fontWeight: '600'
-  },
-  deleteButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: 'rgba(124,58,237,0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 10
-  },
-  emptyContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 40,
-    marginTop: -40
-  },
-  emptyIconContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 20
-  },
-  emptyText: {
-    color: colors.text,
-    fontSize: 20,
-    fontWeight: '900',
-    textAlign: 'center',
-    marginBottom: 8
-  },
-  emptySubtext: {
-    color: colors.outline,
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 26
-  },
-  exploreBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: colors.primaryContainer,
-    paddingHorizontal: 22,
-    paddingVertical: 12,
-    borderRadius: 16,
-    ...shadow
-  },
-  exploreBtnText: {
-    color: '#ede0ff',
-    fontWeight: '800',
-    fontSize: 15
-  }
+  content: { padding: spacing.xl, paddingBottom: spacing.xxxl },
+  tabs: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  search: { marginTop: spacing.lg },
+  sorts: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.lg },
+  sortLabel: { ...typography.caption, color: colors.muted, fontWeight: '800' },
+  item: { flexDirection: 'row', gap: spacing.md, padding: spacing.md, backgroundColor: colors.surface, borderRadius: radius.lg, marginBottom: spacing.md },
+  cover: { width: 76, height: 110, borderRadius: radius.sm, backgroundColor: colors.surface3 },
+  itemInfo: { flex: 1, justifyContent: 'center' },
+  itemTitleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  itemTitle: { ...typography.title, color: colors.text, flex: 1 },
+  chapterText: { ...typography.caption, color: colors.muted, marginTop: spacing.sm },
+  progressTrack: { height: 6, borderRadius: 3, backgroundColor: colors.surface3, overflow: 'hidden', marginTop: spacing.lg },
+  progressFill: { height: '100%', backgroundColor: colors.tertiary },
+  progressText: { ...typography.caption, color: colors.tertiary, marginTop: spacing.xs },
 });
