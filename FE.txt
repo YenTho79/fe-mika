@@ -1,0 +1,59 @@
+NỘI DUNG VÀ BÁO CÁO THỰC HIỆN FRONTEND (MOBILE APP)
+Dự án: App đọc sách online - Mika Books
+Vai trò: Frontend Developer
+Thành viên: Nguyễn Thị Yến Thơ
+Công nghệ: React Native, Expo, Expo Router, AsyncStorage, JavaScript
+
+==================================================
+1. CÁC MÀN HÌNH VÀ LUỒNG ĐÃ CHUYỂN SANG MOBILE (14+ Screens)
+==================================================
+1. Đăng nhập (app/dang-nhap.jsx) - Kết nối API Django POST /api/login/
+2. Đăng ký (app/dang-ky.jsx) - Kết nối API Django POST /api/register/
+3. Trang chủ (app/trang-chu.jsx) - Banner slider, Tìm kiếm live, Lọc thể loại (API GET /api/stories/)
+4. Truyện nổi bật / Khám phá (app/noi-bat.jsx) - Lưới Grid 2 cột & bộ lọc
+5. Sách mới (app/sach-moi.jsx) - Cập nhật danh sách truyện mới ra mắt
+6. Tin tức (app/tin-tuc.jsx) - Thông báo hệ thống & bài viết tin tức
+7. Chi tiết truyện (app/chi-tiet.jsx) - Chi tiết tác giả, tóm tắt, danh sách chương, khóa/mở xu (API GET /api/stories/:id/)
+8. Đọc sách (app/doc-sach.jsx) - Chỉnh cỡ chữ, chuyển chương trước/sau, tự động gợi ý nạp xu khi gặp chương khóa
+9. Tủ sách / Truyện đã lưu (app/truyen-da-luu.jsx) - Quản lý danh sách yêu thích bằng AsyncStorage
+10. Nạp xu (app/nap-xu.jsx) - Chọn các gói nạp xu kèm quà thưởng
+11. Thanh toán (app/thanh-toan.jsx) - Phương thức thanh toán Momo, VNPay, QR Ngân hàng
+12. Thanh toán thành công (app/thanh-toan-thanh-cong.jsx) - Tự động cộng xu vào số dư local và tiếp tục đọc
+13. Chia sẻ truyện (app/chia-se.jsx) - Chọn câu trích dẫn & thiết kế thẻ
+14. Xem trước thẻ chia sẻ (app/xem-truoc-chia-se.jsx) - Review thẻ chuẩn mạng xã hội
+15. Tài khoản cá nhân (app/tai-khoan.jsx) - Quản lý thông tin, số dư xu, đăng xuất
+
+==================================================
+2. CÔNG NGHỆ & THƯ VIỆN ĐÃ SỬ DỤNG
+==================================================
+- Core: React Native, Expo, Expo Router (File-based Routing)
+- Storage: AsyncStorage (Lưu session mika_user, tủ sách đã lưu, số dư xu local)
+- Design System (components/UI.js): Dark Mode hiện đại (Purple Indigo #a07cf0, Deep Slate Background)
+  + Screen: Quản lý Safe Area tai thỏ
+  + Header: Thanh tiêu đề chuẩn có nút Back
+  + Button: Nút Gradient / Outline
+  + Card: Hiệu ứng kính mờ (Glassmorphism)
+  + BookCard: Thẻ hiển thị bìa truyện, lượt xem, đánh giá sao
+  + BottomNav: Thanh điều hướng nổi đáy màn hình (Floating Navigation)
+
+==================================================
+3. KẾT NỐI API BACKEND (constants/api.js)
+==================================================
+- Tự động nhận diện IP LAN máy tính chạy Expo (getDevServerIp) cho thiết bị thật
+- Timeout protection 8 giây tránh treo app khi server ngắt kết nối
+- Tích hợp các API chính:
+  + POST /api/login/ : Đăng nhập tài khoản
+  + POST /api/register/ : Đăng ký tài khoản
+  + GET /api/stories/ : Lấy danh sách truyện & tìm kiếm
+  + GET /api/stories/:id/ : Lấy thông tin chi tiết truyện
+
+==================================================
+4. ĐÁNH GIÁ VÀ HƯỚNG PHÁT TRIỂN TIẾP THEO
+==================================================
+- Giao diện đạt độ hoàn thiện cao, chuẩn UI/UX ứng dụng di động.
+- Hỗ trợ Mock Data Fallback linh hoạt nếu backend ngắt kết nối.
+- Luồng người dùng hoàn chỉnh từ Auth -> Xem -> Đọc -> Nạp Xu -> Lưu tủ sách.
+- Hướng phát triển:
+  + Kết nối API nội dung chữ chi tiết từng chương (GET /api/chapters/:id/).
+  + Đồng bộ số dư Xu với Database backend Django.
+  + Thêm chế độ đọc tùy chỉnh màu nền (Sepia, Tối, Sáng).
