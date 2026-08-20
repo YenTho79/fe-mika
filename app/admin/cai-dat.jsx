@@ -1,14 +1,17 @@
+import { useMemo,  useTheme } from '../../hooks/useTheme';
 import { useCallback, useState } from 'react';
 import { Image, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { AdminFormSection, AdminHeader, AdminPageTitle } from '../../components/AdminUI';
 import { BottomSheet, ConfirmDialog, DangerButton, PrimaryButton, Screen, SecondaryButton, TextField, Toast } from '../../components/UI';
-import { colors, radius, spacing, typography } from '../../constants/theme';
+import { radius, spacing, typography } from '../../constants/theme';
 import { exportLocalData, getAdminSettings, getCategories, getCurrentUser, logout, restoreDemoData, saveAdminSettings, saveCategories } from '../../services/localDataService';
 
 export default function AdminSettings() {
-  const router = useRouter();
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+const router = useRouter();
   const [admin, setAdmin] = useState(null);
   const [settings, setSettings] = useState({ appName: '', bannerTitle: '', bannerSubtitle: '' });
   const [categories, setCategories] = useState([]);
@@ -80,7 +83,7 @@ export default function AdminSettings() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   content: { padding: spacing.xl, paddingBottom: 110 },
   profile: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.lg },
   avatar: { width: 62, height: 62, borderRadius: 31 },

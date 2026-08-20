@@ -55,7 +55,7 @@ export default function TransactionManagement() {
         </AdminSearchFilter>
         {filtered.map((item) => {
           const user = userMap[String(item.userId)];
-          return <AdminListItem key={item.id} icon={item.type === 'deposit' ? 'arrow-down-circle-outline' : 'cart-outline'} title={item.id} subtitle={user ? `${user.name} · ${user.email}` : `Người dùng ${item.userId}`} meta={`${Number(item.coin || 0).toLocaleString('vi-VN')} xu · ${Number(item.amount || 0).toLocaleString('vi-VN')}đ · ${formatDisplayDate(item.createdAt, true)}`} status={item.status} onPress={() => setDetail(item)}>
+          return <AdminListItem key={item.id} icon={item.type === 'deposit' ? 'arrow-down-circle-outline' : 'cart-outline'} title={user ? user.name : `Người dùng ${item.userId}`} subtitle={user ? user.email : 'Không có email'} meta={`${Number(item.coin || 0).toLocaleString('vi-VN')} xu · ${Number(item.amount || 0).toLocaleString('vi-VN')}đ · ${formatDisplayDate(item.createdAt, true)}`} status={item.status} onPress={() => setDetail(item)}>
             <Pressable style={styles.detailButton} onPress={() => setDetail(item)}><Ionicons name="eye-outline" size={16} color={colors.primary} /><Text style={styles.detailText}>Chi tiết</Text></Pressable>
           </AdminListItem>;
         })}
@@ -63,7 +63,6 @@ export default function TransactionManagement() {
       </ScrollView>
       <BottomSheet visible={Boolean(detail)} title="Chi tiết giao dịch" onClose={() => setDetail(null)}>
         {detail ? <View>
-          <DetailRow label="Mã giao dịch" value={detail.id} />
           <DetailRow label="Người dùng" value={userMap[String(detail.userId)]?.name || detail.userId} />
           <DetailRow label="Loại" value={detail.type} />
           <DetailRow label="Số xu" value={`${detail.coin || 0} xu`} />

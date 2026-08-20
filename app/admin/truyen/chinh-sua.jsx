@@ -1,2 +1,5 @@
 import { BookForm } from '../../../components/admin/AdminForms';
-export default function EditBook() { return <BookForm mode="edit" />; }
+import { useTheme } from '../../../hooks/useTheme';
+export default function EditBook() {
+  const { colors } = useTheme();
+ return <BookForm mode="edit" />; }

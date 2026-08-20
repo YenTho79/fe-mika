@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View, RefreshControl } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -33,11 +33,11 @@ import {
   getPurchasedChapterIds,
   getReadingProgress,
   getReviews,
-  hideReview,
   isBookSaved,
   toggleSaveBook,
   updateReview,
 } from '../services/localDataService';
+
 
 export default function BookDetail() {
   const router = useRouter();
@@ -61,6 +61,7 @@ export default function BookDetail() {
   const [validationError, setValidationError] = useState('');
   const [editingReview, setEditingReview] = useState(null);
   const [reviewAction, setReviewAction] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -104,19 +105,22 @@ export default function BookDetail() {
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  const approvedReviews = useMemo(
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }, [load]);
+
+  const visibleReviews = useMemo(
     () => reviews.filter((item) => !item.status || item.status === 'approved'),
     [reviews]
   );
-  const visibleReviews = useMemo(
-    () => reviews.filter((item) => !item.status || item.status === 'approved' || (item.status === 'pending' && String(item.userId) === String(user?.id))),
-    [reviews, user?.id]
-  );
 
   const averageRating = useMemo(() => {
-    if (!approvedReviews.length) return '0.0';
-    return (approvedReviews.reduce((sum, item) => sum + Number(item.rating || 0), 0) / approvedReviews.length).toFixed(1);
-  }, [approvedReviews]);
+    if (!visibleReviews.length) return '0.0';
+    return (visibleReviews.reduce((sum, item) => sum + Number(item.rating || 0), 0) / visibleReviews.length).toFixed(1);
+  }, [visibleReviews]);
+
 
   const handleSave = async () => {
     if (!user) return;
@@ -147,17 +151,16 @@ export default function BookDetail() {
     if (!user) return;
 
     if (editingReview) {
-      const updated = await updateReview(editingReview.id, { rating, content });
-      setReviews((current) => current.map((item) => item.id === updated.id ? updated : item));
+      const updated = await updateReview(editingReview.id, { rating, content }, user.api_token);
+      if (updated) setReviews((current) => current.map((item) => item.id === updated.id ? updated : item));
+
     } else {
       const created = await addReview({
         bookId: book.id,
-        userId: user.id,
-        userName: user.name,
         rating,
         content,
-      });
-      setReviews((current) => [created, ...current]);
+      }, user.api_token);
+      if (created) setReviews((current) => [created, ...current]);
     }
     setComment('');
     setRating(5);
@@ -184,9 +187,10 @@ export default function BookDetail() {
 
   const confirmReviewAction = async () => {
     if (!reviewAction) return;
-    if (reviewAction.type === 'hide') {
-      await hideReview(reviewAction.review.id);
-      setReviews((current) => current.map((item) => item.id === reviewAction.review.id ? { ...item, status: 'hidden' } : item));
+    if (reviewAction.type === 'toggle') {
+      const next = reviewAction.review.status === 'hidden' ? 'approved' : 'hidden';
+      const updated = await updateReview(reviewAction.review.id, { status: next });
+      setReviews((current) => current.map((item) => item.id === updated.id ? updated : item));
     } else {
       await deleteReview(reviewAction.review.id);
       setReviews((current) => current.filter((item) => item.id !== reviewAction.review.id));
@@ -209,7 +213,7 @@ export default function BookDetail() {
         rightIcon="share-social-outline"
         onRight={() => router.push({ pathname: '/chia-se', params: { bookId: book.id } })}
       />
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>
         <View style={styles.heroBackdrop}>
           <Image source={{ uri: book.cover }} style={styles.backdropImage} blurRadius={18} />
           <View style={styles.backdropShade} />
@@ -249,12 +253,15 @@ export default function BookDetail() {
             style={{ flex: 1 }}
           />
         </View>
-        {progress ? (
-          <View style={styles.progressWrap}>
-            <View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${progress.percent || 0}%` }]} /></View>
-            <Text style={styles.progressText}>{progress.percent || 0}% đã đọc</Text>
-          </View>
-        ) : null}
+        {progress ? (() => {
+          const lastChapter = chapters.find((c) => String(c.id) === String(progress.chapterId));
+          return lastChapter ? (
+            <View style={styles.lastReadWrap}>
+              <Ionicons name="book-outline" size={14} color={colors.tertiary} />
+              <Text style={styles.lastReadText}>Lần cuối đọc: Chương {lastChapter.number}</Text>
+            </View>
+          ) : null;
+        })() : null}
 
         <View style={styles.tabs}>
           {['Tổng quan', 'Chương truyện'].map((item) => <FilterChip key={item} label={item} active={tab === item} onPress={() => setTab(item)} />)}
@@ -273,7 +280,7 @@ export default function BookDetail() {
             <View style={styles.categoryRow}>
               {(book.categories || [book.category]).map((item) => <FilterChip key={item} label={item} active />)}
             </View>
-            <SectionHeader title="Đánh giá" action="Viết đánh giá" onPress={openNewReview} subtitle={`${approvedReviews.length} nhận xét đã hiển thị`} />
+            <SectionHeader title="Đánh giá" action="Viết đánh giá" onPress={openNewReview} subtitle={`${visibleReviews.length} nhận xét`} />
             {visibleReviews.length ? visibleReviews.map((review) => (
               <Card key={review.id} style={styles.review}>
                 <View style={styles.reviewHeader}>
@@ -284,24 +291,29 @@ export default function BookDetail() {
                       <Text style={styles.reviewDate}>{formatDisplayDate(review.updatedAt || review.createdAt)}{review.updatedAt ? ' · Đã sửa' : ''}</Text>
                     </View>
                   </View>
-                  <View style={{ alignItems: 'flex-end', gap: spacing.xs }}>
-                    <Text style={styles.reviewStars}>{'★'.repeat(review.rating)}</Text>
-                    {review.status === 'pending' ? <StatusBadge status="pending" label="Chờ duyệt" /> : null}
-                  </View>
+                  <Text style={styles.reviewStars}>{'★'.repeat(review.rating)}</Text>
                 </View>
                 <Text style={styles.reviewBody}>{review.content}</Text>
                 {String(review.userId) === String(user?.id) || user?.role === 'admin' ? (
                   <View style={styles.reviewActions}>
                     {String(review.userId) === String(user?.id) ? (
-                      <Pressable onPress={() => openEditReview(review)} style={styles.reviewAction}><Ionicons name="create-outline" size={17} color={colors.primary} /><Text style={styles.reviewActionText}>Sửa</Text></Pressable>
+                      <Pressable onPress={() => openEditReview(review)} style={styles.reviewAction}>
+                        <Ionicons name="create-outline" size={17} color={colors.primary} />
+                        <Text style={styles.reviewActionText}>Sửa</Text>
+                      </Pressable>
                     ) : null}
-                    <Pressable
-                      onPress={() => setReviewAction({ review, type: user?.role === 'admin' && String(review.userId) !== String(user?.id) ? 'hide' : 'delete' })}
-                      style={styles.reviewAction}
-                    >
-                      <Ionicons name={user?.role === 'admin' && String(review.userId) !== String(user?.id) ? 'eye-off-outline' : 'trash-outline'} size={17} color={colors.danger} />
-                      <Text style={[styles.reviewActionText, { color: colors.danger }]}>{user?.role === 'admin' && String(review.userId) !== String(user?.id) ? 'Ẩn' : 'Xóa'}</Text>
-                    </Pressable>
+                    {String(review.userId) === String(user?.id) ? (
+                      <Pressable onPress={() => setReviewAction({ review, type: 'delete' })} style={styles.reviewAction}>
+                        <Ionicons name="trash-outline" size={17} color={colors.danger} />
+                        <Text style={[styles.reviewActionText, { color: colors.danger }]}>Xóa</Text>
+                      </Pressable>
+                    ) : null}
+                    {user?.role === 'admin' && String(review.userId) !== String(user?.id) ? (
+                      <Pressable onPress={() => setReviewAction({ review, type: 'toggle' })} style={styles.reviewAction}>
+                        <Ionicons name={review.status === 'hidden' ? 'eye-outline' : 'eye-off-outline'} size={17} color={colors.warning} />
+                        <Text style={[styles.reviewActionText, { color: colors.warning }]}>{review.status === 'hidden' ? 'Khôi phục' : 'Ẩn'}</Text>
+                      </Pressable>
+                    ) : null}
                   </View>
                 ) : null}
               </Card>
@@ -352,9 +364,9 @@ export default function BookDetail() {
       </BottomSheet>
       <ConfirmDialog
         visible={Boolean(reviewAction)}
-        title={reviewAction?.type === 'hide' ? 'Ẩn đánh giá này?' : 'Xóa đánh giá này?'}
-        message={reviewAction?.type === 'hide' ? 'Đánh giá sẽ không còn được tính vào điểm trung bình.' : 'Thao tác này không thể hoàn tác.'}
-        confirmText={reviewAction?.type === 'hide' ? 'Ẩn đánh giá' : 'Xóa'}
+        title={reviewAction?.type === 'toggle' ? (reviewAction?.review?.status === 'hidden' ? 'Khôi phục đánh giá?' : 'Ẩn đánh giá này?') : 'Xóa đánh giá này?'}
+        message={reviewAction?.type === 'toggle' ? (reviewAction?.review?.status === 'hidden' ? 'Đánh giá sẽ hiển thị lại với mọi người.' : 'Đánh giá sẽ bị ẩn khỏi trang chi tiết.') : 'Thao tác này không thể hoàn tác.'}
+        confirmText={reviewAction?.type === 'toggle' ? (reviewAction?.review?.status === 'hidden' ? 'Khôi phục' : 'Ẩn') : 'Xóa'}
         onConfirm={confirmReviewAction}
         onCancel={() => setReviewAction(null)}
         isDanger
@@ -389,10 +401,8 @@ const styles = StyleSheet.create({
   statValue: { ...typography.title, color: colors.text },
   statLabel: { ...typography.caption, color: colors.muted, marginTop: spacing.xs },
   actions: { flexDirection: 'row', gap: spacing.sm, marginHorizontal: spacing.xl, marginTop: spacing.lg },
-  progressWrap: { marginHorizontal: spacing.xl, marginTop: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  progressTrack: { flex: 1, height: 6, borderRadius: 3, backgroundColor: colors.surface3, overflow: 'hidden' },
-  progressFill: { height: '100%', backgroundColor: colors.tertiary },
-  progressText: { ...typography.caption, color: colors.tertiary },
+  lastReadWrap: { marginHorizontal: spacing.xl, marginTop: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  lastReadText: { ...typography.caption, color: colors.tertiary, fontWeight: '700' },
   tabs: { flexDirection: 'row', marginHorizontal: spacing.xl, marginTop: spacing.xxl },
   description: { ...typography.body, color: colors.muted, marginHorizontal: spacing.xl },
   moreText: { ...typography.body, color: colors.primary, fontWeight: '800', marginHorizontal: spacing.xl, marginTop: spacing.xs },

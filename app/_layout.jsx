@@ -3,13 +3,14 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useEffect, useState } from 'react';
 import { View, ActivityIndicator } from 'react-native';
-import { colors } from '../constants/theme';
+import { ThemeProvider, useTheme } from '../hooks/useTheme';
 import { initLocalData, getCurrentUser } from '../services/localDataService';
 
-export default function RootLayout() {
+function AppContent() {
   const segments = useSegments();
   const router = useRouter();
   const [isReady, setIsReady] = useState(false);
+  const { isDark, colors } = useTheme();
 
   useEffect(() => {
     async function prepare() {
@@ -36,16 +37,24 @@ export default function RootLayout() {
 
   if (!isReady) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background || '#121212' }}>
-        <ActivityIndicator size="large" color={colors.primary || '#FF6B00'} />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
   return (
     <SafeAreaProvider>
-      <StatusBar style="light" />
+      <StatusBar style={isDark ? "light" : "dark"} />
       <Stack screenOptions={{ headerShown: false }} />
     </SafeAreaProvider>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
   );
 }

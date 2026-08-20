@@ -1,13 +1,16 @@
+import { useMemo,  useTheme } from '../hooks/useTheme';
 import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Card, PasswordField, PrimaryButton, Screen, SecondaryButton, TextField } from '../components/UI';
-import { colors, spacing, typography } from '../constants/theme';
+import { spacing, typography } from '../constants/theme';
 import { getRememberedEmail, login } from '../services/localDataService';
 
 export default function Login() {
-  const router = useRouter();
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(false);
@@ -48,7 +51,7 @@ export default function Login() {
 
   return (
     <Screen padded={false}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
           <View style={styles.logo}><Ionicons name="book" size={36} color={colors.white} /></View>
           <Text style={styles.title}>Chào mừng trở lại</Text>
@@ -90,7 +93,7 @@ export default function Login() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   container: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
   logo: { width: 72, height: 72, borderRadius: 22, backgroundColor: colors.primaryContainer, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.xl },
   title: { ...typography.display, color: colors.text, textAlign: 'center' },

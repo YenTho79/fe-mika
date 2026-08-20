@@ -1,14 +1,17 @@
+import { useTheme } from '../../../hooks/useTheme';
 import { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { AdminHeader, AdminListItem, AdminPageTitle, AdminSearchFilter, ConfirmDeleteModal } from '../../../components/AdminUI';
 import { EmptyState, FilterChip, PrimaryButton, Screen, Toast } from '../../../components/UI';
-import { colors, radius, spacing, typography } from '../../../constants/theme';
+import { radius, spacing, typography } from '../../../constants/theme';
 import { deleteChapter, getAdminBooks, getAdminChapters, moveChapter } from '../../../services/localDataService';
 
 function IconAction({ icon, disabled, danger, onPress }) {
-  return (
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+return (
     <Pressable disabled={disabled} onPress={onPress} style={[styles.iconAction, disabled && { opacity: 0.35 }, danger && styles.danger]}>
       <Ionicons name={icon} size={18} color={danger ? colors.danger : colors.primary} />
     </Pressable>
@@ -16,7 +19,9 @@ function IconAction({ icon, disabled, danger, onPress }) {
 }
 
 export default function ChapterManagement() {
-  const router = useRouter();
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+const router = useRouter();
   const params = useLocalSearchParams();
   const [books, setBooks] = useState([]);
   const [bookId, setBookId] = useState(params.bookId || '');
@@ -65,7 +70,7 @@ export default function ChapterManagement() {
     <Screen padded={false} safeAreaTop={false}>
       <AdminHeader title="Quản lý chương" back />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <AdminPageTitle title={currentBook?.title || 'Chọn truyện'} description={`${chapters.length} chương`} action={<PrimaryButton title="Thêm" icon="add" onPress={() => router.push({ pathname: '/admin/chuong/them', params: { bookId } })} disabled={!bookId} style={{ minWidth: 94 }} />} />
+        <AdminPageTitle title={currentBook?.title || 'Chọn truyện'} description={`${chapters.length} chương`} action={<PrimaryButton title="Thêm chương" onPress={() => router.push({ pathname: '/admin/chuong/them', params: { bookId } })} style={{ minWidth: 120 }} />} />
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.books}>
           {books.map((book) => <FilterChip key={book.id} label={book.title} active={String(book.id) === String(bookId)} onPress={() => selectBook(book.id)} />)}
         </ScrollView>
@@ -99,9 +104,9 @@ export default function ChapterManagement() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   content: { padding: spacing.xl, paddingBottom: 110 },
   books: { gap: spacing.sm, paddingBottom: spacing.lg },
-  iconAction: { width: 36, height: 34, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(210,187,255,0.1)' },
+  iconAction: { width: 36, height: 34, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.emptyCircleBg },
   danger: { backgroundColor: 'rgba(255,180,171,0.1)' },
 });

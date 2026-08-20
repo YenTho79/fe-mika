@@ -1,16 +1,24 @@
+import { useTheme } from '../../hooks/useTheme';
 import { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { AdminHeader, AdminListItem, AdminPageTitle, AdminSearchFilter, ConfirmDeleteModal } from '../../components/AdminUI';
 import { EmptyState, FilterChip, Screen, Toast } from '../../components/UI';
-import { colors, radius, spacing, typography } from '../../constants/theme';
+import { radius, spacing, typography } from '../../constants/theme';
 import { deleteReview, formatDisplayDate, getAdminBooks, getReviews, updateReview } from '../../services/localDataService';
+import { useAuth } from '../../contexts/AuthContext';
 
-function Action({ icon, label, danger, onPress }) { return <Pressable onPress={onPress} style={[styles.action, danger && styles.danger]}><Ionicons name={icon} size={15} color={danger ? colors.danger : colors.primary} /><Text style={[styles.actionText, danger && { color: colors.danger }]}>{label}</Text></Pressable>; }
+function Action({ icon, label, danger, onPress }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+return <Pressable onPress={onPress} style={[styles.action, danger && styles.danger]}><Ionicons name={icon} size={15} color={danger ? colors.danger : colors.primary} /><Text style={[styles.actionText, danger && { color: colors.danger }]}>{label}</Text></Pressable>; }
 
 export default function ReviewManagement() {
-  const router = useRouter();
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+const router = useRouter();
+  const { user } = useAuth();
   const [reviews, setReviews] = useState([]);
   const [books, setBooks] = useState([]);
   const [query, setQuery] = useState('');
@@ -33,25 +41,17 @@ export default function ReviewManagement() {
   }, [bookMap, query, rating, reviews, status]);
 
   const toggleVisibility = async (review) => {
-    const next = review.status === 'hidden' || review.status === 'pending' ? 'approved' : 'hidden';
-    await updateReview(review.id, { status: next });
-    setToast(next === 'hidden' ? 'Đã ẩn đánh giá khỏi khu vực User.' : review.status === 'pending' ? 'Đã duyệt và hiển thị đánh giá.' : 'Đã khôi phục đánh giá.');
+    const next = review.status === 'hidden' ? 'approved' : 'hidden';
+    await updateReview(review.id, { status: next }, user?.api_token);
+    setToast(next === 'hidden' ? 'Đã ẩn đánh giá.' : 'Đã khôi phục đánh giá.');
     load();
-  };
-  const remove = async () => { if (!pendingDelete) return; await deleteReview(pendingDelete.id); setPendingDelete(null); setToast('Đã xóa đánh giá.'); load(); };
-
-  return (
-    <Screen padded={false} safeAreaTop={false}>
-      <AdminHeader title="Kiểm duyệt đánh giá" />
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <AdminPageTitle title={`${reviews.length} đánh giá`} description="Điểm trung bình phía User chỉ tính các đánh giá đang hiển thị." />
         <AdminSearchFilter value={query} onChangeText={setQuery} placeholder="Tìm người viết, truyện hoặc nội dung...">
           {['all', '5', '4', '3', '2', '1'].map((item) => <FilterChip key={item} label={item === 'all' ? 'Mọi số sao' : `${item} sao`} active={rating === item} onPress={() => setRating(item)} />)}
-          {[['all', 'Mọi trạng thái'], ['approved', 'Hiển thị'], ['hidden', 'Đã ẩn'], ['pending', 'Chờ duyệt']].map(([value, label]) => <FilterChip key={value} label={label} active={status === value} onPress={() => setStatus(value)} />)}
+        {[['all', 'Mọi trạng thái'], ['approved', 'Hiển thị'], ['hidden', 'Đã ẩn']].map(([value, label]) => <FilterChip key={value} label={label} active={status === value} onPress={() => setStatus(value)} />)}
         </AdminSearchFilter>
-        {filtered.map((review) => <AdminListItem key={review.id} icon="star-outline" title={`${review.userName} · ${review.rating}★`} subtitle={review.content} meta={`${bookMap[String(review.bookId)]?.title || review.bookId} · ${formatDisplayDate(review.createdAt, true)}`} status={review.status === 'hidden' ? 'locked' : review.status === 'pending' ? 'pending' : 'active'} statusLabel={review.status === 'hidden' ? 'Đã ẩn' : review.status === 'pending' ? 'Chờ duyệt' : 'Hiển thị'}>
+        {filtered.map((review) => <AdminListItem key={review.id} icon="star-outline" title={`${review.userName} · ${review.rating}★`} subtitle={review.content} meta={`${bookMap[String(review.bookId)]?.title || review.bookId} · ${formatDisplayDate(review.createdAt, true)}`} status={review.status === 'hidden' ? 'locked' : 'active'} statusLabel={review.status === 'hidden' ? 'Đã ẩn' : 'Hiển thị'}>
           <Action icon="book-outline" label="Xem truyện" onPress={() => router.push({ pathname: '/chi-tiet', params: { id: review.bookId } })} />
-          <Action icon={review.status === 'pending' ? 'checkmark-circle-outline' : review.status === 'hidden' ? 'eye-outline' : 'eye-off-outline'} label={review.status === 'pending' ? 'Duyệt' : review.status === 'hidden' ? 'Khôi phục' : 'Ẩn'} onPress={() => toggleVisibility(review)} />
+          <Action icon={review.status === 'hidden' ? 'eye-outline' : 'eye-off-outline'} label={review.status === 'hidden' ? 'Khôi phục' : 'Ẩn'} onPress={() => toggleVisibility(review)} />
           <Action icon="trash-outline" label="Xóa" danger onPress={() => setPendingDelete(review)} />
         </AdminListItem>)}
         {!filtered.length ? <EmptyState icon="star-outline" title="Không có đánh giá phù hợp" /> : null}
@@ -62,9 +62,9 @@ export default function ReviewManagement() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   content: { padding: spacing.xl, paddingBottom: 110 },
-  action: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.sm, paddingVertical: 6, borderRadius: radius.sm, backgroundColor: 'rgba(210,187,255,0.1)' },
+  action: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.sm, paddingVertical: 6, borderRadius: radius.sm, backgroundColor: colors.emptyCircleBg },
   danger: { backgroundColor: 'rgba(255,180,171,0.1)' },
   actionText: { ...typography.caption, color: colors.primary, fontWeight: '800' },
 });

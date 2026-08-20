@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Image, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, Share, StyleSheet, Text, View, RefreshControl } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { AppHeader, Card, ErrorState, LoadingSkeleton, Screen, StatusBadge } from '../components/UI';
@@ -50,13 +50,20 @@ export default function ArticleDetail() {
     setFavorite(await toggleFavoriteArticle(user.id, article.id));
   };
 
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }, [load]);
+
   if (loading) return <Screen><LoadingSkeleton height={280} style={{ marginTop: spacing.xxl }} /><LoadingSkeleton height={180} style={{ marginTop: spacing.xl }} /></Screen>;
   if (!article) return <Screen><ErrorState title="Bài viết không tồn tại" message="Bài viết có thể đã bị gỡ hoặc đường dẫn không đúng." onRetry={() => router.replace('/tin-tuc')} /></Screen>;
 
   return (
     <Screen padded={false} safeAreaTop={false}>
       <AppHeader title="Chi tiết tin tức" onBack={() => router.back()} rightIcon="share-social-outline" onRight={shareArticle} />
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>
         <Image source={{ uri: article.image }} style={styles.hero} />
         <View style={styles.metaRow}>
           <StatusBadge status="success" label={article.category} />

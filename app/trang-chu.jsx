@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View, RefreshControl } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -36,25 +36,36 @@ export default function Home() {
   const [restoring, setRestoring] = useState(false);
   const [adminSettings, setAdminSettings] = useState({ appName: 'Mika Books', bannerTitle: 'ĐỀ XUẤT HÔM NAY', bannerSubtitle: '' });
 
-  useFocusEffect(useCallback(() => {
-    let active = true;
-    getCurrentUser().then(async (currentUser) => {
+  const loadData = useCallback(async () => {
+    try {
+      const currentUser = await getCurrentUser();
       const [localArticles, localChapters, localProgress, localAdminSettings] = await Promise.all([
         getArticles(),
         getChapters(),
         currentUser ? getReadingProgressList(currentUser.id) : [],
         getAdminSettings(),
       ]);
-      if (active) {
-        setUser(currentUser);
-        setArticles(localArticles);
-        setChapters(localChapters);
-        setProgressItems(localProgress);
-        setAdminSettings(localAdminSettings);
-      }
-    }).catch((loadError) => console.error('Không thể nạp trang chủ:', loadError));
-    return () => { active = false; };
-  }, []));
+      setUser(currentUser);
+      setArticles(localArticles);
+      setChapters(localChapters);
+      setProgressItems(localProgress);
+      setAdminSettings(localAdminSettings);
+      await reload();
+    } catch (loadError) {
+      console.error('Không thể nạp trang chủ:', loadError);
+    }
+  }, [reload]);
+
+  useFocusEffect(useCallback(() => {
+    loadData();
+  }, [loadData]));
+
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  }, [loadData]);
 
   const featured = useMemo(() => books.filter((book) => book.featured).slice(0, 6), [books]);
   const banners = (featured.length ? featured : books).slice(0, 3);
@@ -94,7 +105,7 @@ export default function Home() {
 
   return (
     <Screen padded={false}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>
         <View style={styles.topRow}>
           <View style={{ flex: 1 }}>
             <Text style={styles.eyebrow}>{adminSettings.appName.toLocaleUpperCase('vi-VN')}</Text>
@@ -170,8 +181,6 @@ export default function Home() {
                       <Text style={styles.continueChapter} numberOfLines={1}>
                         {item.chapter ? `Chương ${item.chapter.number}: ${item.chapter.title}` : 'Chương gần nhất'}
                       </Text>
-                      <View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${Math.min(100, Math.max(0, item.progress.percent || 0))}%` }]} /></View>
-                      <Text style={styles.progressText}>{item.progress.percent || 0}% đã đọc</Text>
                     </View>
                   </Pressable>
                 ))}

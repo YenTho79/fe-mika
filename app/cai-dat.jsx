@@ -1,10 +1,11 @@
+import { useMemo,  useTheme } from '../hooks/useTheme';
 import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import Constants from 'expo-constants';
 import { Ionicons } from '@expo/vector-icons';
 import { AppHeader, Card, ConfirmDialog, FilterChip, LoadingSkeleton, Screen, Toast } from '../components/UI';
-import { colors, radius, spacing, typography } from '../constants/theme';
+import { radius, spacing, typography } from '../constants/theme';
 import {
   clearSearchHistory,
   deleteReadingProgress,
@@ -22,6 +23,9 @@ const fontSizes = [
 ];
 
 export default function Settings() {
+  const { colors, changeTheme } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+
   const router = useRouter();
   const [settings, setSettings] = useState(null);
   const [confirmAction, setConfirmAction] = useState('');
@@ -35,6 +39,9 @@ export default function Settings() {
     const next = { ...settings, ...patch };
     setSettings(next);
     await saveAppSettings(next);
+    if (patch.appearance) {
+      changeTheme(patch.appearance === 'system' ? 'dark' : patch.appearance);
+    }
   };
 
   const confirm = async () => {
@@ -71,8 +78,9 @@ export default function Settings() {
           <Section title="Giao diện ứng dụng">
             <Card style={styles.card}>
               <Text style={styles.itemTitle}>Chế độ hiển thị</Text>
-              <Text style={styles.itemSubtitle}>Chọn giao diện tối cố định hoặc đồng bộ với thiết bị.</Text>
+              <Text style={styles.itemSubtitle}>Chọn giao diện sáng hoặc tối, hoặc đồng bộ với thiết bị.</Text>
               <View style={styles.chips}>
+                <FilterChip label="Sáng" icon="sunny-outline" active={settings.appearance === 'light'} onPress={() => update({ appearance: 'light' })} />
                 <FilterChip label="Tối" icon="moon-outline" active={settings.appearance === 'dark'} onPress={() => update({ appearance: 'dark' })} />
                 <FilterChip label="Theo hệ thống" icon="phone-portrait-outline" active={settings.appearance === 'system'} onPress={() => update({ appearance: 'system' })} />
               </View>
@@ -144,10 +152,14 @@ export default function Settings() {
 }
 
 function Section({ title, children }) {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   return <View><Text style={styles.sectionTitle}>{title}</Text>{children}</View>;
 }
 
 function SettingSwitch({ icon, title, subtitle, value, onValueChange }) {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   return (
     <View style={styles.switchRow}>
       <View style={styles.settingIcon}><Ionicons name={icon} size={21} color={colors.primary} /></View>
@@ -158,6 +170,8 @@ function SettingSwitch({ icon, title, subtitle, value, onValueChange }) {
 }
 
 function ActionRow({ icon, title, onPress, danger, last }) {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   return (
     <Pressable onPress={onPress} style={[styles.actionRow, !last && styles.actionDivider]}>
       <Ionicons name={icon} size={21} color={danger ? colors.danger : colors.primary} />
@@ -167,19 +181,19 @@ function ActionRow({ icon, title, onPress, danger, last }) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   content: { padding: spacing.xl, paddingBottom: spacing.xxxl },
   sectionTitle: { ...typography.title, color: colors.text, marginTop: spacing.lg, marginBottom: spacing.md },
   card: { gap: spacing.md },
   itemTitle: { ...typography.body, color: colors.text, fontWeight: '800' },
   itemSubtitle: { ...typography.caption, color: colors.muted, marginTop: 2 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.xs },
-  divider: { height: 1, backgroundColor: 'rgba(255,255,255,0.08)', marginVertical: spacing.xs },
+  divider: { height: 1, backgroundColor: colors.outline + '20', marginVertical: spacing.xs },
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  settingIcon: { width: 40, height: 40, borderRadius: radius.md, backgroundColor: 'rgba(124,58,237,0.15)', alignItems: 'center', justifyContent: 'center' },
+  settingIcon: { width: 40, height: 40, borderRadius: radius.md, backgroundColor: colors.highlightBg, alignItems: 'center', justifyContent: 'center' },
   actionCard: { padding: 0, overflow: 'hidden' },
   actionRow: { minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg },
-  actionDivider: { borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)' },
+  actionDivider: { borderBottomWidth: 1, borderBottomColor: colors.outline + '20' },
   actionText: { ...typography.body, color: colors.text, fontWeight: '700', flex: 1 },
   about: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   logo: { width: 52, height: 52, borderRadius: radius.lg, backgroundColor: colors.primaryContainer, alignItems: 'center', justifyContent: 'center' },

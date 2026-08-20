@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text } from 'react-native';
+import { useMemo, useState, useCallback } from 'react';
+import { ScrollView, StyleSheet, Text, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   AppHeader,
@@ -25,10 +25,17 @@ export default function NewBooks() {
     [books, status]
   );
 
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await reload();
+    setRefreshing(false);
+  }, [reload]);
+
   return (
     <Screen padded={false} safeAreaTop={false}>
       <AppHeader title="Sách mới" onBack={() => router.back()} />
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>
         <Text style={styles.title}>Mới cập nhật</Text>
         <Text style={styles.subtitle}>Danh sách được sắp xếp trực tiếp từ kho dữ liệu local.</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>

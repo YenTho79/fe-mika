@@ -1,9 +1,10 @@
+import { useTheme } from '../hooks/useTheme';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Image, Pressable, ScrollView, Share as NativeShare, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { AppHeader, Button, Card, ErrorState, FilterChip, LoadingSkeleton, Screen } from '../components/UI';
-import { colors, radius, spacing, typography } from '../constants/theme';
+import { radius, spacing, typography } from '../constants/theme';
 import { getBookById } from '../services/localDataService';
 import { buildBookShareText } from '../services/shareService';
 
@@ -23,7 +24,9 @@ async function copyShareText(text) {
 }
 
 export default function ShareBook() {
-  const router = useRouter();
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+const router = useRouter();
   const params = useLocalSearchParams();
   const bookId = params.bookId || params.id || 'b1';
   const [book, setBook] = useState(null);
@@ -82,7 +85,7 @@ export default function ShareBook() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   content: { padding: spacing.xl, paddingBottom: spacing.xxxl },
   bookSummary: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
   cover: { width: 72, height: 104, borderRadius: radius.md, backgroundColor: colors.surface3 },
@@ -90,7 +93,7 @@ const styles = StyleSheet.create({
   author: { ...typography.body, color: colors.tertiary, marginTop: spacing.xs },
   sectionTitle: { ...typography.title, color: colors.text, marginTop: spacing.xxl, marginBottom: spacing.md },
   chips: { flexDirection: 'row', gap: spacing.sm },
-  quote: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', marginBottom: spacing.sm },
+  quote: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.borderLight, marginBottom: spacing.sm },
   quoteActive: { borderColor: colors.primary, backgroundColor: 'rgba(124,58,237,0.18)' },
   quoteText: { ...typography.body, color: colors.muted, flex: 1 },
   copyButton: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: spacing.sm, padding: spacing.lg },

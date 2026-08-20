@@ -1,3 +1,4 @@
+import { useMemo,  useTheme } from '../hooks/useTheme';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -14,12 +15,14 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, shadow, shadowSmall, radius, spacing } from '../constants/theme';
+import { shadow, shadowSmall, radius, spacing } from '../constants/theme';
 
 // ================= LAYOUT COMPONENTS =================
 
 export function Screen({ children, padded = true, safeAreaTop = true, style }) {
-  const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+const insets = useSafeAreaInsets();
   return (
     <View
       style={[
@@ -35,7 +38,9 @@ export function Screen({ children, padded = true, safeAreaTop = true, style }) {
 }
 
 export function AppHeader({ title, onBack, rightIcon, onRight, rightElement, subtitle }) {
-  const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+const insets = useSafeAreaInsets();
   return (
     <View style={[styles.header, { paddingTop: insets.top, height: 60 + insets.top }]}>
       <View style={styles.headerLeft}>
@@ -77,7 +82,9 @@ export function AppHeader({ title, onBack, rightIcon, onRight, rightElement, sub
 export const Header = AppHeader;
 
 export function Card({ children, style, onPress }) {
-  if (onPress) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+if (onPress) {
     return (
       <Pressable
         onPress={onPress}
@@ -93,7 +100,9 @@ export function Card({ children, style, onPress }) {
 // ================= BUTTON COMPONENTS =================
 
 export function PrimaryButton({ title, onPress, icon, disabled, loading, style, textStyle }) {
-  return (
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+return (
     <Pressable
       onPress={disabled || loading ? null : onPress}
       disabled={disabled || loading}
@@ -106,11 +115,11 @@ export function PrimaryButton({ title, onPress, icon, disabled, loading, style, 
       ]}
     >
       {loading ? (
-        <ActivityIndicator size="small" color="#ede0ff" />
+        <ActivityIndicator size="small" color={colors.buttonText} />
       ) : (
         <>
           <Text style={[styles.buttonText, textStyle]}>{title}</Text>
-          {icon ? <Ionicons name={icon} size={18} color="#ede0ff" /> : null}
+          {icon ? <Ionicons name={icon} size={18} color={colors.buttonText} /> : null}
         </>
       )}
     </Pressable>
@@ -118,7 +127,9 @@ export function PrimaryButton({ title, onPress, icon, disabled, loading, style, 
 }
 
 export function SecondaryButton({ title, onPress, icon, disabled, loading, style, textStyle }) {
-  return (
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+return (
     <Pressable
       onPress={disabled || loading ? null : onPress}
       disabled={disabled || loading}
@@ -143,7 +154,9 @@ export function SecondaryButton({ title, onPress, icon, disabled, loading, style
 }
 
 export function DangerButton({ title, onPress, icon, disabled, loading, style, textStyle }) {
-  return (
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+return (
     <Pressable
       onPress={disabled || loading ? null : onPress}
       disabled={disabled || loading}
@@ -156,11 +169,11 @@ export function DangerButton({ title, onPress, icon, disabled, loading, style, t
       ]}
     >
       {loading ? (
-        <ActivityIndicator size="small" color="#ffffff" />
+        <ActivityIndicator size="small" color={colors.white} />
       ) : (
         <>
-          <Text style={[styles.buttonText, { color: '#ffffff' }, textStyle]}>{title}</Text>
-          {icon ? <Ionicons name={icon} size={18} color="#ffffff" /> : null}
+          <Text style={[styles.buttonText, { color: colors.white }, textStyle]}>{title}</Text>
+          {icon ? <Ionicons name={icon} size={18} color={colors.white} /> : null}
         </>
       )}
     </Pressable>
@@ -168,7 +181,9 @@ export function DangerButton({ title, onPress, icon, disabled, loading, style, t
 }
 
 export function Button({ title, onPress, icon, variant = 'primary', style, disabled, loading, textStyle }) {
-  if (variant === 'secondary' || variant === 'outline') {
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+if (variant === 'secondary' || variant === 'outline') {
     return <SecondaryButton title={title} onPress={onPress} icon={icon} disabled={disabled} loading={loading} style={style} textStyle={textStyle} />;
   }
   if (variant === 'danger') {
@@ -180,7 +195,9 @@ export function Button({ title, onPress, icon, variant = 'primary', style, disab
 // ================= FORM & INPUT COMPONENTS =================
 
 export function FormField({ label, error, required, children, style }) {
-  return (
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+return (
     <View style={[{ marginBottom: 16 }, style]}>
       {label ? (
         <Text style={styles.formLabel}>
@@ -207,7 +224,9 @@ export function TextField({
   numberOfLines,
   ...props
 }) {
-  return (
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+return (
     <FormField label={label} error={error}>
       <View
         style={[
@@ -236,7 +255,9 @@ export function TextField({
 }
 
 export function PasswordField({ label = 'Mật khẩu', value, onChangeText, placeholder = '••••••••', error, disabled, style, ...props }) {
-  const [showPassword, setShowPassword] = useState(false);
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+const [showPassword, setShowPassword] = useState(false);
   return (
     <FormField label={label} error={error}>
       <View style={[styles.inputContainer, error && styles.inputErrorBorder, disabled && styles.inputDisabled, style]}>
@@ -260,7 +281,9 @@ export function PasswordField({ label = 'Mật khẩu', value, onChangeText, pla
 }
 
 export function SearchField({ value, onChangeText, onClear, placeholder = 'Tìm kiếm truyện, tác giả...', style, ...props }) {
-  return (
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+return (
     <View style={[styles.inputContainer, styles.searchContainer, style]}>
       <Ionicons name="search" size={20} color={colors.outline} style={{ marginRight: 10 }} />
       <TextInput
@@ -283,7 +306,9 @@ export function SearchField({ value, onChangeText, onClear, placeholder = 'Tìm 
 // ================= BOOK & LIST COMPONENTS =================
 
 export function BookCard({ book, onPress, style }) {
-  if (!book) return null;
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+if (!book) return null;
   return (
     <Pressable
       onPress={onPress}
@@ -306,7 +331,9 @@ export function BookCard({ book, onPress, style }) {
 }
 
 export function BookListItem({ book, onPress, onLongPress, style }) {
-  if (!book) return null;
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+if (!book) return null;
   return (
     <Pressable
       onPress={onPress}
@@ -337,7 +364,9 @@ export function BookListItem({ book, onPress, onLongPress, style }) {
 }
 
 export function ChapterListItem({ chapter, onPress, isRead, isCurrent, isLocked, isUnlocked = false, style }) {
-  if (!chapter) return null;
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+if (!chapter) return null;
   return (
     <Pressable
       onPress={onPress}
@@ -386,7 +415,9 @@ export function ChapterListItem({ chapter, onPress, isRead, isCurrent, isLocked,
 // ================= BADGES, CHIPS & HEADERS =================
 
 export function SectionHeader({ title, action, onPress, subtitle, style }) {
-  return (
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+return (
     <View style={[styles.sectionHeader, style]}>
       <View>
         <Text style={styles.sectionTitle}>{title}</Text>
@@ -404,7 +435,9 @@ export function SectionHeader({ title, action, onPress, subtitle, style }) {
 export const SectionTitle = SectionHeader;
 
 export function FilterChip({ label, active, onPress, count, icon, style }) {
-  return (
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
@@ -414,7 +447,7 @@ export function FilterChip({ label, active, onPress, count, icon, style }) {
         style
       ]}
     >
-      {icon ? <Ionicons name={icon} size={14} color={active ? '#ede0ff' : colors.muted} style={{ marginRight: 6 }} /> : null}
+      {icon ? <Ionicons name={icon} size={14} color={active ? colors.chipActiveText : colors.muted} style={{ marginRight: 6 }} /> : null}
       <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
       {count !== undefined ? (
         <View style={[styles.chipCount, active && styles.chipCountActive]}>
@@ -428,7 +461,9 @@ export function FilterChip({ label, active, onPress, count, icon, style }) {
 export const Chip = FilterChip;
 
 export function StatusBadge({ status, label, style }) {
-  let badgeColor = colors.surface3;
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+let badgeColor = colors.surface3;
   let textColor = colors.text;
   let statusText = label || status || 'Bình thường';
 
@@ -453,7 +488,9 @@ export function StatusBadge({ status, label, style }) {
 // ================= FEEDBACK & EMPTY STATES =================
 
 export function EmptyState({ icon = 'folder-open-outline', title = 'Chưa có dữ liệu', message = 'Hiện tại chưa có thông tin nào để hiển thị ở đây.', actionTitle, onAction, style }) {
-  return (
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+return (
     <View style={[styles.emptyContainer, style]}>
       <View style={styles.emptyIconCircle}>
         <Ionicons name={icon} size={42} color={colors.primary} />
@@ -468,7 +505,9 @@ export function EmptyState({ icon = 'folder-open-outline', title = 'Chưa có d�
 }
 
 export function ErrorState({ title = 'Có lỗi xảy ra', message = 'Không thể nạp dữ liệu. Vui lòng thử lại sau.', onRetry, style }) {
-  return (
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+return (
     <View style={[styles.emptyContainer, style]}>
       <View style={[styles.emptyIconCircle, { backgroundColor: 'rgba(255, 180, 171, 0.15)' }]}>
         <Ionicons name="alert-circle-outline" size={42} color={colors.danger} />
@@ -483,7 +522,9 @@ export function ErrorState({ title = 'Có lỗi xảy ra', message = 'Không th�
 }
 
 export function LoadingSkeleton({ width = '100%', height = 20, borderRadius = 8, style }) {
-  const opacity = useRef(new Animated.Value(0.3)).current;
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+const opacity = useRef(new Animated.Value(0.3)).current;
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -515,7 +556,9 @@ export function LoadingSkeleton({ width = '100%', height = 20, borderRadius = 8,
 // ================= MODALS & OVERLAYS =================
 
 export function ConfirmDialog({ visible, title, message, confirmText = 'Xác nhận', cancelText = 'Hủy', onConfirm, onCancel, isDanger }) {
-  return (
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
       <View style={styles.modalOverlay}>
         <View style={styles.dialogBox}>
@@ -533,9 +576,12 @@ export function ConfirmDialog({ visible, title, message, confirmText = 'Xác nh�
       </View>
     </Modal>
   );
+
 }
 
 export function BottomSheet({ visible, onClose, title, children }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -559,6 +605,8 @@ export function BottomSheet({ visible, onClose, title, children }) {
 }
 
 export function Toast({ visible, message, type = 'info', onDismiss }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
   useEffect(() => {
     if (!visible || !onDismiss) return undefined;
     const timer = setTimeout(onDismiss, 2600);
@@ -592,23 +640,29 @@ export function Toast({ visible, message, type = 'info', onDismiss }) {
 
 // ================= ADMIN COMPONENTS =================
 
-export function StatCard({ title, value, change, icon, color = colors.primaryContainer, style }) {
+export function StatCard({ title, value, change, icon, color, style, onPress }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+  const bgColor = color || colors.primaryContainer;
+  const Wrapper = onPress ? Pressable : View;
   return (
-    <View style={[styles.card, styles.statCard, style]}>
-      <View style={[styles.statIconBox, { backgroundColor: color }]}>
-        <Ionicons name={icon || 'analytics'} size={22} color="#ede0ff" />
+    <Wrapper onPress={onPress} style={[styles.card, styles.statCard, style]}>
+      <View style={[styles.statIconBox, { backgroundColor: bgColor }]}>
+        <Ionicons name={icon || 'analytics'} size={22} color={colors.buttonText} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={styles.statTitle}>{title}</Text>
-        <Text style={styles.statValue}>{value}</Text>
+        <Text style={styles.statTitle} numberOfLines={1} adjustsFontSizeToFit>{title}</Text>
+        <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
         {change ? <Text style={styles.statChange}>{change}</Text> : null}
       </View>
-    </View>
+    </Wrapper>
   );
 }
 
 export function ImagePickerPlaceholder({ uri, onPress, label = 'Tải ảnh lên', style }) {
-  return (
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+return (
     <Pressable onPress={onPress} style={[styles.imagePickerBox, style]}>
       {uri ? (
         <Image source={{ uri }} style={styles.imagePickerPreview} resizeMode="cover" />
@@ -625,7 +679,9 @@ export function ImagePickerPlaceholder({ uri, onPress, label = 'Tải ảnh lên
 // ================= NAVIGATION COMPONENT =================
 
 export function BottomNav({ router, active = 'home' }) {
-  const items = [
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+const items = [
     { key: 'home', label: 'Trang chủ', icon: 'home', route: '/trang-chu' },
     { key: 'featured', label: 'Khám phá', icon: 'compass', route: '/kham-pha' },
     { key: 'new', label: 'Sách mới', icon: 'library', route: '/sach-moi' },
@@ -645,7 +701,7 @@ export function BottomNav({ router, active = 'home' }) {
 
 // ================= STYLES =================
 
-export const styles = StyleSheet.create({
+export const getStyles = (colors) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   padded: { paddingHorizontal: 20 },
   pressedState: { opacity: 0.75 },
@@ -654,12 +710,12 @@ export const styles = StyleSheet.create({
   header: {
     height: 60,
     paddingHorizontal: 16,
-    backgroundColor: 'rgba(11,19,38,0.96)',
+    backgroundColor: colors.headerBg,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.08)'
+    borderBottomColor: colors.borderLight
   },
   headerLeft: { width: 40, alignItems: 'flex-start' },
   headerCenter: { flex: 1, alignItems: 'center' },
@@ -672,14 +728,14 @@ export const styles = StyleSheet.create({
     borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)'
+    backgroundColor: colors.iconBtnBg
   },
 
   // Card
   card: {
-    backgroundColor: 'rgba(34,42,61,0.82)',
+    backgroundColor: colors.cardBg,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: colors.borderLight,
     borderRadius: radius.lg,
     padding: 16,
     ...shadow
@@ -693,15 +749,14 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     flexDirection: 'row',
     gap: 8,
-    paddingHorizontal: 16,
-    ...shadowSmall
+    paddingHorizontal: 16
   },
-  primaryButton: { backgroundColor: colors.primaryContainer },
-  secondaryButton: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.primary },
+  primaryButton: { backgroundColor: colors.primary },
+  secondaryButton: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.primary },
   dangerButton: { backgroundColor: colors.dangerContainer },
   disabledButton: { opacity: 0.5 },
   pressedButton: { opacity: 0.8, transform: [{ scale: 0.98 }] },
-  buttonText: { color: '#ede0ff', fontWeight: '800', fontSize: 15 },
+  buttonText: { color: colors.buttonText, fontWeight: '800', fontSize: 15 },
 
   // Form Inputs
   formLabel: { color: colors.muted, fontWeight: '700', fontSize: 13, marginBottom: 6 },
@@ -711,7 +766,7 @@ export const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: colors.surface3,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: colors.borderLight,
     paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center'
@@ -743,7 +798,7 @@ export const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)'
+    borderColor: colors.borderLight
   },
   bookListItemCover: { width: 80, height: 115, borderRadius: radius.sm, backgroundColor: colors.surface3 },
   bookListItemInfo: { flex: 1, marginLeft: 12, justifyContent: 'space-between' },
@@ -762,9 +817,9 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)'
+    borderColor: colors.borderLight
   },
-  chapterItemCurrent: { backgroundColor: 'rgba(124, 58, 237, 0.15)', borderColor: colors.primaryContainer },
+  chapterItemCurrent: { backgroundColor: colors.highlightBg, borderColor: colors.primaryContainer },
   chapterTitle: { color: colors.text, fontSize: 14, fontWeight: '600' },
   chapterDate: { color: colors.muted, fontSize: 11, marginTop: 2 },
   lockBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
@@ -782,16 +837,16 @@ export const styles = StyleSheet.create({
     borderRadius: radius.round,
     backgroundColor: colors.surface2,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: colors.borderLight,
     flexDirection: 'row',
     alignItems: 'center',
     marginRight: 8
   },
   chipActive: { backgroundColor: colors.primaryContainer, borderColor: colors.primary },
   chipText: { color: colors.muted, fontWeight: '700', fontSize: 13 },
-  chipTextActive: { color: '#ede0ff' },
-  chipCount: { backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, marginLeft: 6 },
-  chipCountActive: { backgroundColor: '#ede0ff' },
+  chipTextActive: { color: colors.white },
+  chipCount: { backgroundColor: colors.chipCountBg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, marginLeft: 6 },
+  chipCountActive: { backgroundColor: colors.chipCountActiveBg },
   chipCountText: { color: colors.text, fontSize: 11, fontWeight: '800' },
 
   badgeContainer: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
@@ -803,7 +858,7 @@ export const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: 'rgba(210, 187, 255, 0.1)',
+    backgroundColor: colors.emptyCircleBg,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16
@@ -847,8 +902,8 @@ export const styles = StyleSheet.create({
   toastText: { color: colors.text, fontWeight: '700', fontSize: 14 },
 
   // Admin
-  statCard: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 12 },
-  statIconBox: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  statCard: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, padding: 12 },
+  statIconBox: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   statTitle: { color: colors.muted, fontSize: 13, fontWeight: '600' },
   statValue: { color: colors.text, fontSize: 20, fontWeight: '900', marginTop: 2 },
   statChange: { color: colors.tertiary, fontSize: 12, fontWeight: '700', marginTop: 2 },
@@ -875,9 +930,9 @@ export const styles = StyleSheet.create({
     bottom: 14,
     height: 64,
     borderRadius: 24,
-    backgroundColor: 'rgba(23,31,51,0.96)',
+    backgroundColor: colors.navBg,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: colors.borderLight,
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',

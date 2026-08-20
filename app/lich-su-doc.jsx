@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View, RefreshControl } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -77,6 +77,13 @@ export default function ReadingHistory() {
     params: { bookId: book.id, ...(chapter ? { chapter: chapter.id } : {}) },
   });
 
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }, [load]);
+
   return (
     <Screen padded={false} safeAreaTop={false}>
       <AppHeader
@@ -88,7 +95,7 @@ export default function ReadingHistory() {
           </Pressable>
         ) : null}
       />
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>
         {loading ? [1, 2, 3].map((item) => <LoadingSkeleton key={item} height={110} style={{ marginBottom: spacing.md }} />) : null}
         {!loading && Object.entries(groups).map(([label, groupItems]) => groupItems.length ? (
           <View key={label}>

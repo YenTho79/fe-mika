@@ -1,14 +1,17 @@
+import { useMemo,  useTheme } from '../hooks/useTheme';
 import { useRef, useState } from 'react';
 import { ScrollView, View, Text, Pressable, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Button, Card, Header, Screen } from '../components/UI';
-import { colors, radius, spacing, typography } from '../constants/theme';
+import { radius, spacing, typography } from '../constants/theme';
 
 const formatMoney = (value) => `${Number(value || 0).toLocaleString('vi-VN')}đ`;
 
 export default function Payment() {
-  const router = useRouter();
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+const router = useRouter();
   const params = useLocalSearchParams();
   const coin = Math.max(0, Number(params.coin) || 0);
   const bonus = Math.max(0, Number(params.bonus) || 0);
@@ -66,14 +69,14 @@ export default function Payment() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   content: { padding: spacing.xl, paddingBottom: spacing.xxxl },
   invalid: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   small: { color: colors.muted, fontSize: 12, fontWeight: '900', letterSpacing: 1 },
   rowEnd: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.sm },
   title: { ...typography.heading, color: colors.text, flex: 1 },
   desc: { ...typography.body, color: colors.muted },
-  line: { height: 1, backgroundColor: 'rgba(255,255,255,0.08)', marginVertical: spacing.lg },
+  line: { height: 1, backgroundColor: colors.borderLight, marginVertical: spacing.lg },
   row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.md, gap: spacing.md },
   text: { color: colors.text, fontWeight: '800', fontSize: 16 },
   green: { color: colors.tertiary, fontWeight: '900' },

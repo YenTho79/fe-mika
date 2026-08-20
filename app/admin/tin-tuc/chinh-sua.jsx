@@ -1,2 +1,5 @@
 import { ArticleForm } from '../../../components/admin/AdminForms';
-export default function EditArticle() { return <ArticleForm mode="edit" />; }
+import { useTheme } from '../../../hooks/useTheme';
+export default function EditArticle() {
+  const { colors } = useTheme();
+ return <ArticleForm mode="edit" />; }

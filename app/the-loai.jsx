@@ -1,12 +1,15 @@
+import { useTheme } from '../hooks/useTheme';
 import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AppHeader, BookListItem, EmptyState, ErrorState, FilterChip, LoadingSkeleton, Screen } from '../components/UI';
-import { colors, spacing, typography } from '../constants/theme';
+import { spacing, typography } from '../constants/theme';
 import { useLocalBooks } from '../hooks/useLocalBooks';
 
 export default function CategoryResults() {
-  const router = useRouter();
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+const router = useRouter();
   const { name = '' } = useLocalSearchParams();
   const categoryName = Array.isArray(name) ? name[0] : name;
   const { books, loading, error, reload } = useLocalBooks();
@@ -40,7 +43,7 @@ export default function CategoryResults() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   content: { padding: spacing.xl, paddingBottom: spacing.xxxl },
   title: { ...typography.display, color: colors.text },
   subtitle: { ...typography.body, color: colors.muted, marginTop: spacing.xs },

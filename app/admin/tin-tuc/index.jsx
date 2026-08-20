@@ -1,16 +1,22 @@
+import { useTheme } from '../../../hooks/useTheme';
 import { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { AdminHeader, AdminListItem, AdminPageTitle, AdminSearchFilter, ConfirmDeleteModal } from '../../../components/AdminUI';
 import { EmptyState, FilterChip, PrimaryButton, Screen, Toast } from '../../../components/UI';
-import { colors, radius, spacing, typography } from '../../../constants/theme';
+import { radius, spacing, typography } from '../../../constants/theme';
 import { deleteArticle, formatDisplayDate, getArticles } from '../../../services/localDataService';
 
-function Action({ icon, label, danger, onPress }) { return <Pressable onPress={onPress} style={[styles.action, danger && styles.danger]}><Ionicons name={icon} size={15} color={danger ? colors.danger : colors.primary} /><Text style={[styles.actionText, danger && { color: colors.danger }]}>{label}</Text></Pressable>; }
+function Action({ icon, label, danger, onPress }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+return <Pressable onPress={onPress} style={[styles.action, danger && styles.danger]}><Ionicons name={icon} size={15} color={danger ? colors.danger : colors.primary} /><Text style={[styles.actionText, danger && { color: colors.danger }]}>{label}</Text></Pressable>; }
 
 export default function ArticleManagement() {
-  const router = useRouter();
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+const router = useRouter();
   const [articles, setArticles] = useState([]);
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('all');
@@ -43,9 +49,9 @@ export default function ArticleManagement() {
     </Screen>
   );
 }
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   content: { padding: spacing.xl, paddingBottom: 110 },
-  action: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.sm, paddingVertical: 6, borderRadius: radius.sm, backgroundColor: 'rgba(210,187,255,0.1)' },
+  action: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.sm, paddingVertical: 6, borderRadius: radius.sm, backgroundColor: colors.emptyCircleBg },
   danger: { backgroundColor: 'rgba(255,180,171,0.1)' },
   actionText: { ...typography.caption, color: colors.primary, fontWeight: '800' },
 });

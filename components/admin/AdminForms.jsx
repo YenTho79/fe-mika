@@ -1,10 +1,11 @@
+import { useTheme } from '../../hooks/useTheme';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { AdminFormSection, AdminHeader, FALLBACK_COVER } from '../AdminUI';
 import { FilterChip, ImagePickerPlaceholder, PrimaryButton, Screen, SecondaryButton, TextField, Toast } from '../UI';
-import { colors, radius, spacing, typography } from '../../constants/theme';
+import { radius, spacing, typography } from '../../constants/theme';
 import {
   getAdminBooks,
   getAdminChapters,
@@ -21,7 +22,9 @@ const today = () => new Date().toISOString().slice(0, 10);
 const isWebUrl = (value) => /^https?:\/\/\S+$/i.test(String(value || '').trim());
 
 function ToggleRow({ label, description, value, onChange }) {
-  return (
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+return (
     <Pressable onPress={() => onChange(!value)} style={styles.toggleRow}>
       <View style={{ flex: 1 }}>
         <Text style={styles.toggleLabel}>{label}</Text>
@@ -35,6 +38,8 @@ function ToggleRow({ label, description, value, onChange }) {
 }
 
 export function BookForm({ mode = 'create' }) {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const router = useRouter();
   const { id } = useLocalSearchParams();
   const [categories, setCategories] = useState([]);
@@ -112,6 +117,8 @@ export function BookForm({ mode = 'create' }) {
 }
 
 export function ChapterForm({ mode = 'create' }) {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const router = useRouter();
   const params = useLocalSearchParams();
   const id = params.id;
@@ -165,7 +172,7 @@ export function ChapterForm({ mode = 'create' }) {
             {books.map((book) => <FilterChip key={book.id} label={book.title} active={String(form.bookId) === String(book.id)} onPress={() => patch('bookId', book.id)} />)}
           </ScrollView>
           {errors.bookId ? <Text style={styles.error}>{errors.bookId}</Text> : null}
-          <TextField label="Số chương" value={form.number} onChangeText={(value) => patch('number', value)} keyboardType="number-pad" error={errors.number} />
+          <TextField label="Thứ tự chương" value={form.number} onChangeText={(value) => patch('number', value)} keyboardType="number-pad" error={errors.number} />
           <TextField label="Tiêu đề" value={form.title} onChangeText={(value) => patch('title', value)} error={errors.title} placeholder="Tên chương" />
         </AdminFormSection>
         <AdminFormSection title="Nội dung">
@@ -185,6 +192,8 @@ export function ChapterForm({ mode = 'create' }) {
 }
 
 export function ArticleForm({ mode = 'create' }) {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const router = useRouter();
   const { id } = useLocalSearchParams();
   const [form, setForm] = useState({ title: '', summary: '', content: '', image: '', category: 'Thông báo', status: 'published', featured: false, publishedAt: today() });
@@ -234,7 +243,7 @@ export function ArticleForm({ mode = 'create' }) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   content: { padding: spacing.xl, paddingBottom: 110 },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   fieldLabel: { ...typography.caption, color: colors.muted, fontWeight: '700', marginBottom: spacing.sm },

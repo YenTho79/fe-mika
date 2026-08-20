@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View, RefreshControl } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { AppHeader, Card, EmptyState, FilterChip, LoadingSkeleton, Screen, StatusBadge } from '../components/UI';
@@ -16,22 +16,34 @@ export default function TransactionHistory() {
   const [filter, setFilter] = useState('all');
   const [loading, setLoading] = useState(true);
 
-  useFocusEffect(useCallback(() => {
+  const load = useCallback(async () => {
     setLoading(true);
-    getCurrentUser().then(async (user) => {
+    try {
+      const user = await getCurrentUser();
       const transactions = user ? await getTransactions(user.id) : [];
       setItems(transactions.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)));
-    }).finally(() => setLoading(false));
-  }, []));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const filtered = useMemo(() => items.filter((item) => (
     filter === 'all' || (filter === 'deposit' ? isDeposit(item) : !isDeposit(item))
   )), [filter, items]);
 
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }, [load]);
+
   return (
     <Screen padded={false} safeAreaTop={false}>
       <AppHeader title="Lịch sử giao dịch" onBack={() => router.back()} />
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
           <FilterChip label="Tất cả" active={filter === 'all'} onPress={() => setFilter('all')} count={items.length} />
           <FilterChip label="Nạp xu" active={filter === 'deposit'} onPress={() => setFilter('deposit')} count={items.filter(isDeposit).length} />

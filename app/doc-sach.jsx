@@ -1,5 +1,6 @@
+import { useTheme } from '../hooks/useTheme';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View, ActivityIndicator, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -12,7 +13,7 @@ import {
   Screen,
   SecondaryButton,
 } from '../components/UI';
-import { colors, readerThemes, radius, spacing, typography } from '../constants/theme';
+import { readerThemes, radius, spacing, typography } from '../constants/theme';
 import {
   getBookById,
   getAppSettings,
@@ -24,6 +25,7 @@ import {
   purchaseChapter,
   saveReaderSettings,
   saveReadingProgress,
+  getChapterById,
 } from '../services/localDataService';
 
 const fontOptions = [
@@ -34,24 +36,23 @@ const fontOptions = [
 const lineHeightOptions = [
   { value: 1.45, label: 'Gọn' },
   { value: 1.7, label: 'Vừa' },
-  { value: 2, label: 'Thoáng' },
+  { value: 2.0, label: 'Rộng' },
 ];
 
 export default function Reader() {
+  const { isDark, colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
   const router = useRouter();
   const params = useLocalSearchParams();
   const bookId = params.bookId || 'b1';
-  const scrollRef = useRef(null);
-  const restoredKeyRef = useRef('');
-  const latestProgressRef = useRef(null);
-  const viewportHeightRef = useRef(0);
-  const contentHeightRef = useRef(0);
+
   const [book, setBook] = useState(null);
   const [chapters, setChapters] = useState([]);
+  const [chapterId, setChapterId] = useState(null);
   const [user, setUser] = useState(null);
   const [purchasedIds, setPurchasedIds] = useState([]);
-  const [chapterId, setChapterId] = useState(null);
   const [progress, setProgress] = useState(null);
+
   const [settings, setSettings] = useState({
     fontSize: 18,
     theme: 'dark',
@@ -60,59 +61,94 @@ export default function Reader() {
     textAlign: 'justify',
   });
   const [appSettings, setAppSettings] = useState({ autoSaveProgress: true });
+
   const [controlsVisible, setControlsVisible] = useState(true);
-  const [showSettings, setShowSettings] = useState(false);
   const [showChapters, setShowChapters] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [pendingChapter, setPendingChapter] = useState(null);
-  const [unlocking, setUnlocking] = useState(false);
+
   const [scrollState, setScrollState] = useState({ offset: 0, percent: 0 });
-  const [bookmarked, setBookmarked] = useState(false);
   const [atChapterEnd, setAtChapterEnd] = useState(false);
+  const [bookmarked, setBookmarked] = useState(false);
+
+  const scrollRef = useRef(null);
+  const viewportHeightRef = useRef(0);
+  const contentHeightRef = useRef(0);
+  const restoredKeyRef = useRef('');
+  const latestProgressRef = useRef({ user: null, chapter: null, scrollState: { offset: 0, percent: 0 }, autoSaveProgress: true });
 
   useEffect(() => {
     let active = true;
+
     Promise.all([
       getBookById(bookId),
       getChapters(bookId),
       getReaderSettings(),
-      getCurrentUser(),
       getAppSettings(),
-    ]).then(async ([nextBook, nextChapters, nextSettings, currentUser, nextAppSettings]) => {
-      const [nextProgress, nextPurchasedIds] = currentUser
-        ? await Promise.all([
-          getReadingProgress(currentUser.id, bookId),
-          getPurchasedChapterIds(currentUser.id),
-        ])
-        : [null, []];
+      getCurrentUser(),
+      getReadingProgress(),
+    ]).then(([b, chs, rSet, aSet, currentUser, allProgress]) => {
       if (!active) return;
-      setBook(nextBook);
-      setChapters(nextChapters);
-      setSettings(nextSettings);
-      setAppSettings(nextAppSettings);
+      setBook(b);
+      setChapters(chs);
+      setSettings(rSet);
+      setAppSettings(aSet);
       setUser(currentUser);
-      setProgress(nextProgress);
-      setPurchasedIds(nextPurchasedIds);
 
-      const requested = nextChapters.find((item) => String(item.id) === String(params.chapter));
-      const recent = nextChapters.find((item) => String(item.id) === String(nextProgress?.chapterId));
-      const target = requested || recent || nextChapters[0] || null;
-      if (target?.locked && !nextPurchasedIds.includes(String(target.id))) {
-        setPendingChapter(target);
-        const fallback = recent && (!recent.locked || nextPurchasedIds.includes(String(recent.id)))
-          ? recent
-          : nextChapters.find((item) => !item.locked || nextPurchasedIds.includes(String(item.id)));
-        setChapterId(fallback?.id || null);
-      } else {
-        setChapterId(target?.id || null);
+      const userProg = currentUser ? allProgress.find((item) => item.userId === currentUser.id && item.bookId === bookId) : null;
+      setProgress(userProg);
+
+      const targetId = params.chapter || (userProg ? userProg.chapterId : chs[0]?.id);
+      setChapterId(targetId);
+
+      if (currentUser) {
+        getPurchasedChapterIds(currentUser.id).then((ids) => {
+          if (active) setPurchasedIds(ids);
+        });
       }
-    }).catch((error) => console.error('Không thể mở trình đọc:', error));
+    });
+
     return () => { active = false; };
   }, [bookId, params.chapter]);
+
+  const [loadingContent, setLoadingContent] = useState(false);
+
+  useEffect(() => {
+    if (!chapterId) return;
+
+    let active = true;
+    setLoadingContent(true);
+    getChapterById(chapterId)
+      .then((detail) => {
+        if (!active || !detail) return;
+        setChapters((prevChapters) => {
+          const exists = prevChapters.some((c) => String(c.id) === String(chapterId));
+          if (exists) {
+            return prevChapters.map((c) =>
+              String(c.id) === String(chapterId) ? { ...c, content: detail.content } : c
+            );
+          } else {
+            return [...prevChapters, detail].sort((a, b) => Number(a.number) - Number(b.number));
+          }
+        });
+      })
+      .catch((err) => console.error('Lỗi tải chi tiết chương:', err))
+      .finally(() => {
+        if (active) setLoadingContent(false);
+      });
+
+    return () => { active = false; };
+  }, [chapterId]);
 
   const currentIndex = chapters.findIndex((item) => String(item.id) === String(chapterId));
   const chapter = chapters[currentIndex] || null;
   const nextChapter = chapters[currentIndex + 1] || null;
-  const theme = readerThemes[settings.theme] || readerThemes.dark;
+
+  // Sync reader theme with global app theme unless explicitly customized
+  const activeThemeKey = settings.explicitTheme
+    ? settings.theme
+    : (isDark ? 'dark' : 'light');
+  const theme = readerThemes[activeThemeKey] || (isDark ? readerThemes.dark : readerThemes.light);
 
   useEffect(() => {
     latestProgressRef.current = { user, chapter, scrollState, autoSaveProgress: appSettings.autoSaveProgress };
@@ -140,68 +176,59 @@ export default function Reader() {
   const persistProgress = useCallback(async (state = scrollState, force = false) => {
     if (!user || !chapter) return null;
     if (!force && !appSettings.autoSaveProgress) return null;
-    const saved = await saveReadingProgress({
+    const item = {
       userId: user.id,
       bookId,
       chapterId: chapter.id,
       page: Math.max(0, Math.round(state.offset)),
       percent: state.percent,
-    });
-    setProgress(saved);
-    return saved;
+    };
+    setProgress(item);
+    return saveReadingProgress(item);
   }, [appSettings.autoSaveProgress, bookId, chapter, scrollState, user]);
 
-  const updateSettings = useCallback((patch) => {
-    setSettings((current) => {
-      const next = { ...current, ...patch };
-      saveReaderSettings(next);
-      return next;
-    });
-  }, []);
+  const updateSettings = (patch) => {
+    const next = { ...settings, ...patch, explicitTheme: true };
+    setSettings(next);
+    saveReaderSettings(next);
+  };
 
   const requestChapter = (target) => {
     if (!target) return;
-    if (target.locked && !purchasedIds.includes(String(target.id))) {
-      setShowChapters(false);
-      setPendingChapter(target);
-      return;
-    }
-    persistProgress();
-    restoredKeyRef.current = '';
-    setChapterId(target.id);
-    setShowChapters(false);
-  };
-
-  const unlockChapter = async () => {
-    if (!pendingChapter || !user) return;
-    setUnlocking(true);
-    const result = await purchaseChapter(user.id, pendingChapter);
-    setUnlocking(false);
-    if (!result.success && result.code === 'INSUFFICIENT_COINS') {
-      setPendingChapter(null);
-      router.push({ pathname: '/nap-xu', params: { returnBookId: bookId, returnChapterId: pendingChapter.id } });
-      return;
-    }
-    if (result.success) {
-      setPurchasedIds((current) => [...new Set([...current, String(pendingChapter.id)])]);
-      setUser((current) => current ? { ...current, coinBalance: result.balance ?? current.coinBalance } : current);
-      const target = pendingChapter;
-      setPendingChapter(null);
-      restoredKeyRef.current = '';
+    const isUnlocked = target.price === 0 || user?.isVip || purchasedIds.includes(String(target.id));
+    if (isUnlocked) {
       setChapterId(target.id);
+      return;
+    }
+    setPendingChapter(target);
+  };
+
+  const handlePurchase = async () => {
+    if (!pendingChapter || !user) return;
+    const res = await purchaseChapter(user.id, pendingChapter.id, pendingChapter.price);
+    if (res.success) {
+      setPurchasedIds((prev) => [...prev, String(pendingChapter.id)]);
+      setUser(res.user);
+      setChapterId(pendingChapter.id);
+      setPendingChapter(null);
+    } else {
+      Alert.alert('Thất bại', res.message || 'Không thể mua chương.');
     }
   };
 
-  const onScroll = ({ nativeEvent }) => {
-    const offset = Math.max(0, nativeEvent.contentOffset.y);
-    const viewport = nativeEvent.layoutMeasurement.height;
-    const contentHeight = nativeEvent.contentSize.height;
-    const scrollable = Math.max(1, contentHeight - viewport);
-    const percent = contentHeight <= viewport + 1
-      ? 100
-      : Math.min(100, Math.max(0, Math.round((offset / scrollable) * 100)));
+  const onScroll = (e) => {
+    const offset = e.nativeEvent.contentOffset.y;
+    const contentH = e.nativeEvent.contentSize.height;
+    const layoutH = e.nativeEvent.layoutMeasurement.height;
+
+    const maxScroll = contentH - layoutH;
+    const percent = maxScroll > 0 ? Math.min(100, Math.max(0, Math.round((offset / maxScroll) * 100))) : 100;
+
     setScrollState({ offset, percent });
-    setAtChapterEnd(percent >= 98);
+
+    if (maxScroll <= 0 || offset >= maxScroll - 40) {
+      setAtChapterEnd(true);
+    }
   };
 
   const restorePosition = () => {
@@ -249,7 +276,9 @@ export default function Reader() {
         contentContainerStyle={[styles.content, { backgroundColor: theme.background }]}
         onTouchEnd={() => setControlsVisible((current) => !current)}
       >
-        {chapter ? (
+        {loadingContent && (!chapter || !chapter.content) ? (
+          <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 100 }} />
+        ) : chapter ? (
           <>
             <Text style={[styles.chapterNumber, { color: theme.text }]}>CHƯƠNG {chapter.number}</Text>
             <Text style={[styles.chapterTitle, { color: theme.text }]}>{chapter.title}</Text>
@@ -302,8 +331,8 @@ export default function Reader() {
               onRight={() => setShowSettings(true)}
             />
           </View>
-          <View style={[styles.bottomControls, { backgroundColor: theme.surface }]}>
-            <View style={[styles.readerProgressTrack, { backgroundColor: theme.outline }]}>
+          <View style={[styles.bottomControls, { backgroundColor: theme.surface, borderColor: theme.outline || colors.borderLight }]}>
+            <View style={[styles.readerProgressTrack, { backgroundColor: theme.outline || colors.borderLight }]}>
               <View style={[styles.readerProgressFill, { width: `${scrollState.percent}%` }]} />
             </View>
             <Pressable onPress={() => setShowChapters(true)} style={styles.controlButton}>
@@ -326,7 +355,7 @@ export default function Reader() {
               key={item.id}
               chapter={item}
               isCurrent={String(item.id) === String(chapterId)}
-              isUnlocked={purchasedIds.includes(String(item.id))}
+              isUnlocked={user?.isVip || purchasedIds.includes(String(item.id))}
               onPress={() => requestChapter(item)}
             />
           ))}
@@ -342,36 +371,31 @@ export default function Reader() {
         </View>
         <Text style={styles.settingLabel}>Giao diện</Text>
         <View style={styles.row}>
-          {Object.entries(readerThemes).map(([key, value]) => <FilterChip key={key} label={value.name} active={settings.theme === key} onPress={() => updateSettings({ theme: key })} />)}
+          {Object.entries(readerThemes).map(([key, value]) => <FilterChip key={key} label={value.name} active={activeThemeKey === key} onPress={() => updateSettings({ theme: key })} />)}
         </View>
         <Text style={styles.settingLabel}>Phông chữ</Text>
         <View style={styles.row}>
-          {fontOptions.map((font) => <FilterChip key={font.value} label={font.label} active={settings.fontFamily === font.value} onPress={() => updateSettings({ fontFamily: font.value })} />)}
+          {fontOptions.map((item) => <FilterChip key={item.value} label={item.label} active={settings.fontFamily === item.value} onPress={() => updateSettings({ fontFamily: item.value })} />)}
         </View>
-        <Text style={styles.settingLabel}>Khoảng cách dòng</Text>
+        <Text style={styles.settingLabel}>Giãn dòng</Text>
         <View style={styles.row}>
-          {lineHeightOptions.map((option) => <FilterChip key={option.value} label={option.label} active={settings.lineHeight === option.value} onPress={() => updateSettings({ lineHeight: option.value })} />)}
-        </View>
-        <Text style={styles.settingLabel}>Căn lề</Text>
-        <View style={styles.row}>
-          <FilterChip label="Căn trái" active={settings.textAlign === 'left'} onPress={() => updateSettings({ textAlign: 'left' })} />
-          <FilterChip label="Căn đều" active={settings.textAlign === 'justify'} onPress={() => updateSettings({ textAlign: 'justify' })} />
+          {lineHeightOptions.map((item) => <FilterChip key={item.value} label={item.label} active={settings.lineHeight === item.value} onPress={() => updateSettings({ lineHeight: item.value })} />)}
         </View>
       </BottomSheet>
 
       <ConfirmDialog
         visible={Boolean(pendingChapter)}
-        title={`Mở khóa chương ${pendingChapter?.number || ''}?`}
-        message={`Chương này cần ${pendingChapter?.coinPrice || 0} xu. Số dư hiện tại của bạn là ${user?.coinBalance || 0} xu.`}
-        confirmText={unlocking ? 'Đang mở...' : `Dùng ${pendingChapter?.coinPrice || 0} xu`}
-        onConfirm={unlocking ? undefined : unlockChapter}
+        title="Mở khóa chương?"
+        message={pendingChapter ? `Dùng ${pendingChapter.price} xu để mở khóa "${pendingChapter.title}"?` : ''}
+        confirmText="Mở khóa"
+        onConfirm={handlePurchase}
         onCancel={() => setPendingChapter(null)}
       />
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   content: { flexGrow: 1, paddingHorizontal: spacing.xxl, paddingTop: 110, paddingBottom: 130 },
   chapterNumber: { ...typography.caption, fontWeight: '900', letterSpacing: 2, textAlign: 'center' },
   chapterTitle: { ...typography.display, textAlign: 'center', marginTop: spacing.sm, marginBottom: spacing.xxxl },
@@ -394,17 +418,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
     overflow: 'hidden',
+    borderWidth: 1,
   },
   readerProgressTrack: { position: 'absolute', top: 0, left: 0, right: 0, height: 4 },
   readerProgressFill: { height: '100%', backgroundColor: colors.tertiary },
   controlButton: { minWidth: 60, alignItems: 'center', gap: 2 },
   controlText: { ...typography.caption },
-  percentText: { ...typography.title },
-  settingLabel: { ...typography.body, color: colors.muted, fontWeight: '800', marginTop: spacing.md, marginBottom: spacing.sm },
-  fontSizeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
+  percentText: { ...typography.body, fontWeight: '800' },
+  chapterSheet: { maxHeight: 360 },
+  settingLabel: { ...typography.body, color: colors.muted, fontWeight: '800', marginTop: spacing.md, marginBottom: spacing.xs },
+  fontSizeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginVertical: spacing.xs },
   roundButton: { width: 52, height: 42, borderRadius: 14, backgroundColor: colors.surface3, alignItems: 'center', justifyContent: 'center' },
   roundText: { ...typography.title, color: colors.primary },
-  fontValue: { ...typography.title, color: colors.text },
-  row: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  chapterSheet: { maxHeight: 430 },
+  fontValue: { ...typography.title, color: colors.text, fontWeight: '800' },
+  row: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginVertical: spacing.xs },
 });

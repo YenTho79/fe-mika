@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View, RefreshControl } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { AppHeader, Card, EmptyState, ErrorState, FilterChip, LoadingSkeleton, Screen, SearchField, StatusBadge } from '../components/UI';
@@ -58,10 +58,17 @@ export default function News() {
 
   const openArticle = (article) => router.push({ pathname: '/chi-tiet-tin-tuc', params: { id: article.id } });
 
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }, [load]);
+
   return (
     <Screen padded={false} safeAreaTop={false}>
       <AppHeader title="Tin tức Mika" onBack={() => router.back()} />
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>
         {loading ? <><LoadingSkeleton height={230} /><LoadingSkeleton height={48} style={{ marginTop: spacing.lg }} /><LoadingSkeleton height={190} style={{ marginTop: spacing.lg }} /></> : null}
         {!loading && error ? <ErrorState title="Không tải được tin tức" message={error} onRetry={load} /> : null}
         {!loading && !error && articles.length ? (

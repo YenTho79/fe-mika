@@ -22,3 +22,5 @@ export const STORAGE_KEYS = {
   CATEGORIES: 'mika_categories',
   COIN_ADJUSTMENTS: 'mika_coin_adjustments',
 };
+
+export const THEME_PREFERENCE = 'theme_preference';

@@ -1,9 +1,10 @@
+import { useMemo,  useTheme } from '../hooks/useTheme';
 import { useCallback, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { AppHeader, Card, LoadingSkeleton, PrimaryButton, Screen, StatusBadge, TextField, Toast } from '../components/UI';
-import { colors, radius, spacing, typography } from '../constants/theme';
+import { radius, spacing, typography } from '../constants/theme';
 import { formatDisplayDate, getCurrentUser, updateCurrentUserProfile } from '../services/localDataService';
 
 const avatarOptions = [
@@ -14,7 +15,9 @@ const avatarOptions = [
 ];
 
 export default function PersonalInfo() {
-  const router = useRouter();
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+const router = useRouter();
   const [user, setUser] = useState(null);
   const [name, setName] = useState('');
   const [avatar, setAvatar] = useState('');
@@ -103,7 +106,7 @@ export default function PersonalInfo() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   content: { padding: spacing.xl, paddingBottom: spacing.xxxl },
   avatarCard: { alignItems: 'center', marginBottom: spacing.xl },
   avatarLarge: { width: 94, height: 94, borderRadius: 47, backgroundColor: colors.surface3, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
@@ -120,5 +123,5 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
   metaLabel: { ...typography.body, color: colors.muted },
   metaValue: { ...typography.body, color: colors.text, fontWeight: '800' },
-  divider: { height: 1, backgroundColor: 'rgba(255,255,255,0.08)' },
+  divider: { height: 1, backgroundColor: colors.borderLight },
 });

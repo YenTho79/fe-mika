@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View, RefreshControl } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -115,10 +115,17 @@ export default function Library() {
     completed: ['checkmark-circle-outline', 'Chưa hoàn thành truyện', 'Những truyện đọc đến cuối sẽ được lưu tại đây.'],
   }[tab];
 
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }, [load]);
+
   return (
     <Screen padded={false} safeAreaTop={false}>
       <AppHeader title="Tủ sách của tôi" onBack={() => router.back()} />
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>
         <View style={styles.tabs}>
           {tabs.map((item) => (
             <FilterChip
@@ -187,10 +194,9 @@ function LibraryItem({ book, chapter, progress, isSaved, onPress, onRemove }) {
         <Text style={styles.chapterText} numberOfLines={1}>
           {chapter ? `Chương ${chapter.number}: ${chapter.title}` : 'Chưa bắt đầu đọc'}
         </Text>
-        <View style={styles.progressTrack}>
-          <View style={[styles.progressFill, { width: `${progress?.percent || 0}%` }]} />
-        </View>
-        <Text style={styles.progressText}>{progress?.percent || 0}% đã đọc</Text>
+        {chapter ? (
+          <Text style={styles.lastReadText}>Lần cuối đọc: Chương {chapter.number}</Text>
+        ) : null}
       </View>
     </Pressable>
   );
@@ -208,7 +214,5 @@ const styles = StyleSheet.create({
   itemTitleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   itemTitle: { ...typography.title, color: colors.text, flex: 1 },
   chapterText: { ...typography.caption, color: colors.muted, marginTop: spacing.sm },
-  progressTrack: { height: 6, borderRadius: 3, backgroundColor: colors.surface3, overflow: 'hidden', marginTop: spacing.lg },
-  progressFill: { height: '100%', backgroundColor: colors.tertiary },
-  progressText: { ...typography.caption, color: colors.tertiary, marginTop: spacing.xs },
+  lastReadText: { ...typography.caption, color: colors.tertiary, marginTop: spacing.sm },
 });

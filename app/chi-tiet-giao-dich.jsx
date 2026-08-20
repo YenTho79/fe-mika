@@ -1,16 +1,19 @@
+import { useMemo,  useTheme } from '../hooks/useTheme';
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { AppHeader, Card, EmptyState, LoadingSkeleton, Screen, StatusBadge } from '../components/UI';
-import { colors, radius, spacing, typography } from '../constants/theme';
+import { radius, spacing, typography } from '../constants/theme';
 import { formatDisplayDate, getCurrentUser, getTransactionById } from '../services/localDataService';
 
 const statusLabel = { success: 'Thành công', pending: 'Đang xử lý', processing: 'Đang xử lý', failed: 'Thất bại' };
 const formatMoney = (value) => `${Number(value || 0).toLocaleString('vi-VN')}đ`;
 
 export default function TransactionDetail() {
-  const router = useRouter();
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+const router = useRouter();
   const { id } = useLocalSearchParams();
   const [item, setItem] = useState(undefined);
 
@@ -63,10 +66,12 @@ export default function TransactionDetail() {
 }
 
 function Detail({ label, value, last }) {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   return <View style={[styles.detailRow, !last && styles.divider]}><Text style={styles.label}>{label}</Text><Text style={styles.value}>{value || '—'}</Text></View>;
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   content: { padding: spacing.xl, paddingBottom: spacing.xxxl },
   summary: { alignItems: 'center', gap: spacing.sm },
   icon: { width: 68, height: 68, borderRadius: 34, alignItems: 'center', justifyContent: 'center' },
@@ -74,7 +79,7 @@ const styles = StyleSheet.create({
   coin: { fontSize: 30, lineHeight: 38, fontWeight: '900' },
   details: { marginTop: spacing.xl, paddingVertical: 0 },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.xl, paddingVertical: spacing.lg },
-  divider: { borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)' },
+  divider: { borderBottomWidth: 1, borderBottomColor: colors.borderLight },
   label: { ...typography.body, color: colors.muted },
   value: { ...typography.body, color: colors.text, fontWeight: '800', flex: 1, textAlign: 'right' },
   note: { flexDirection: 'row', gap: spacing.sm, padding: spacing.lg, borderRadius: radius.lg, backgroundColor: 'rgba(78,222,163,0.09)', marginTop: spacing.lg },

@@ -1,13 +1,16 @@
+import { useMemo,  useTheme } from '../hooks/useTheme';
 import { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Button, Card, ErrorState, LoadingSkeleton, Screen } from '../components/UI';
-import { colors, spacing, typography } from '../constants/theme';
+import { spacing, typography } from '../constants/theme';
 import { completeCoinTopup, getCurrentUser } from '../services/localDataService';
 
 export default function PaymentSuccess() {
-  const router = useRouter();
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+const router = useRouter();
   const params = useLocalSearchParams();
   const startedRef = useRef(false);
   const [result, setResult] = useState(null);
@@ -69,7 +72,7 @@ export default function PaymentSuccess() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   loadingText: { ...typography.body, color: colors.muted, marginTop: spacing.lg },
   container: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: spacing.xxl },
@@ -80,7 +83,7 @@ const styles = StyleSheet.create({
   small: { ...typography.caption, color: colors.muted, fontWeight: '900', textTransform: 'uppercase' },
   balance: { color: colors.primary, fontSize: 48, fontWeight: '900', marginVertical: spacing.sm },
   coinUnit: { fontSize: 22 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.md, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)', paddingTop: spacing.md, marginTop: spacing.md },
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.md, borderTopWidth: 1, borderTopColor: colors.borderLight, paddingTop: spacing.md, marginTop: spacing.md },
   code: { color: colors.text, fontWeight: '900', flex: 1, textAlign: 'right' },
   value: { color: colors.text, fontWeight: '800' },
   button: { width: '100%' },

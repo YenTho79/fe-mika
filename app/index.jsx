@@ -1,10 +1,14 @@
+import { useMemo,  useTheme } from '../hooks/useTheme';
 import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { colors } from '../constants/theme';
+
 import { getCurrentUser, initLocalData } from '../services/localDataService';
 
 export default function Index() {
+  const { colors } = useTheme();
+
+
   const router = useRouter();
 
   useEffect(() => {

@@ -1,10 +1,11 @@
+import { useMemo,  useTheme } from '../hooks/useTheme';
 import { useCallback, useState } from 'react';
 import { ScrollView, View, Text, Pressable, StyleSheet } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Button, Card, Header, LoadingSkeleton, Screen } from '../components/UI';
-import { coinPackages } from '../data/books';
-import { colors, radius, spacing, typography } from '../constants/theme';
+import { coinPackages } from '../constants/config';
+import { radius, spacing, typography } from '../constants/theme';
 import { getCurrentUser } from '../services/localDataService';
 
 const paymentMethods = [
@@ -16,7 +17,9 @@ const paymentMethods = [
 const parsePrice = (price) => Number(String(price).replace(/[^0-9]/g, '')) || 0;
 
 export default function Topup() {
-  const router = useRouter();
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+const router = useRouter();
   const params = useLocalSearchParams();
   const [selected, setSelected] = useState(2);
   const [method, setMethod] = useState('MoMo');
@@ -84,21 +87,21 @@ export default function Topup() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   content: { padding: spacing.xl, paddingBottom: spacing.xxxl },
   balance: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   wallet: { width: 54, height: 54, borderRadius: 27, backgroundColor: 'rgba(124,58,237,0.2)', alignItems: 'center', justifyContent: 'center' },
   muted: { ...typography.caption, color: colors.muted },
   balanceText: { color: colors.text, fontSize: 26, fontWeight: '900', marginTop: spacing.xs },
   section: { ...typography.heading, color: colors.text, marginTop: spacing.xxl, marginBottom: spacing.md },
-  package: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.surface, padding: spacing.lg, borderRadius: radius.lg, marginBottom: spacing.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  package: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.surface, padding: spacing.lg, borderRadius: radius.lg, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.borderLight },
   packageActive: { backgroundColor: colors.primaryContainer, borderColor: colors.primary },
   packageInfo: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   packageTitle: { color: colors.text, fontSize: 17, fontWeight: '900' },
   price: { color: colors.primary, fontWeight: '900', fontSize: 16 },
   activeText: { color: colors.white },
   activeMuted: { color: 'rgba(255,255,255,0.78)' },
-  method: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surface, padding: spacing.lg, borderRadius: radius.lg, marginBottom: spacing.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  method: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surface, padding: spacing.lg, borderRadius: radius.lg, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.borderLight },
   methodActive: { borderColor: colors.primary },
   methodIcon: { width: 38, height: 38, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
   historyLink: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: spacing.sm, padding: spacing.lg },

@@ -1,9 +1,10 @@
+import { useTheme } from '../hooks/useTheme';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Image, ImageBackground, ScrollView, Share as NativeShare, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { AppHeader, Button, ErrorState, LoadingSkeleton, Screen } from '../components/UI';
-import { colors, radius, shadow, spacing, typography } from '../constants/theme';
+import { radius, shadow, spacing, typography } from '../constants/theme';
 import { getBookById } from '../services/localDataService';
 import { buildBookShareText } from '../services/shareService';
 
@@ -14,6 +15,8 @@ const QUOTES = [
 ];
 
 function FakeQr({ seed }) {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const cells = Array.from({ length: 100 }, (_, index) => {
     const code = seed.charCodeAt(index % seed.length) || 1;
     const row = Math.floor(index / 10);
@@ -25,7 +28,9 @@ function FakeQr({ seed }) {
 }
 
 export default function SharePreview() {
-  const router = useRouter();
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+const router = useRouter();
   const params = useLocalSearchParams();
   const bookId = params.bookId || params.id || 'b1';
   const layout = params.layout === 'horizontal' ? 'horizontal' : 'vertical';
@@ -84,7 +89,7 @@ export default function SharePreview() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   wrapper: { padding: spacing.xl, alignItems: 'center', paddingBottom: spacing.xxxl },
   verticalCard: { width: '100%', maxWidth: 390, aspectRatio: 9 / 14, ...shadow },
   overlay: { flex: 1, borderRadius: radius.xl, padding: spacing.xl, justifyContent: 'space-between', backgroundColor: 'rgba(0,0,0,0.35)' },
@@ -93,7 +98,7 @@ const styles = StyleSheet.create({
   horizontalBody: { flex: 1, padding: spacing.xl, justifyContent: 'space-between' },
   brand: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   brandText: { color: colors.white, fontWeight: '900', fontSize: 18 },
-  info: { backgroundColor: 'rgba(11,19,38,0.88)', borderRadius: radius.lg, padding: spacing.lg },
+  info: { backgroundColor: colors.headerBg, borderRadius: radius.lg, padding: spacing.lg },
   quote: { ...typography.body, color: colors.primary, fontStyle: 'italic', marginBottom: spacing.md },
   title: { ...typography.heading, color: colors.text },
   author: { ...typography.body, color: colors.tertiary, fontWeight: '800', marginTop: spacing.xs },

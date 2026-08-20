@@ -1,12 +1,15 @@
+import { useMemo,  useTheme } from '../hooks/useTheme';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { AppHeader, Card, PasswordField, PrimaryButton, Screen, TextField } from '../components/UI';
-import { colors, spacing, typography } from '../constants/theme';
+import { spacing, typography } from '../constants/theme';
 import { registerUser } from '../services/localDataService';
 
 export default function Register() {
-  const router = useRouter();
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+const router = useRouter();
   const [form, setForm] = useState({ name: '', email: '', password: '', confirmPassword: '' });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
@@ -42,10 +45,10 @@ export default function Register() {
   return (
     <Screen padded={false} safeAreaTop={false}>
       <AppHeader title="Tạo tài khoản" onBack={() => router.back()} />
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
           <Text style={styles.title}>Gia nhập Mika Books</Text>
-          <Text style={styles.description}>Thông tin được lưu ngay trên thiết bị cho bản demo local.</Text>
+          <Text style={styles.description}>Đăng ký tài khoản để bắt đầu hành trình đọc sách cùng Mika.</Text>
           <Card style={styles.card}>
             <TextField label="Họ và tên" value={form.name} onChangeText={update('name')} icon="person-outline" error={errors.name} />
             <TextField label="Email" value={form.email} onChangeText={update('email')} icon="mail-outline" error={errors.email} autoCapitalize="none" keyboardType="email-address" />
@@ -69,7 +72,7 @@ export default function Register() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   container: { padding: spacing.xl, paddingBottom: spacing.xxxl },
   title: { ...typography.heading, color: colors.text },
   description: { ...typography.body, color: colors.muted, marginTop: spacing.xs },

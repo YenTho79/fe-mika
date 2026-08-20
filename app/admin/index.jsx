@@ -4,7 +4,8 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { AdminHeader, AdminPageTitle } from '../../components/AdminUI';
 import { Card, EmptyState, PrimaryButton, Screen, SectionHeader, StatCard, StatusBadge } from '../../components/UI';
-import { colors, radius, spacing, typography } from '../../constants/theme';
+import { useTheme } from '../../hooks/useTheme';
+import { radius, spacing, typography } from '../../constants/theme';
 import { formatDisplayDate, getAdminBooks, getAdminChapters, getCurrentUser, getReviews, getTransactions, getUsers } from '../../services/localDataService';
 
 const parseViews = (value) => {
@@ -14,6 +15,8 @@ const parseViews = (value) => {
 };
 
 export default function AdminDashboard() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
   const router = useRouter();
   const [data, setData] = useState({ user: null, books: [], chapters: [], users: [], transactions: [], reviews: [] });
   const load = useCallback(async () => {
@@ -27,7 +30,7 @@ export default function AdminDashboard() {
   const topBooks = useMemo(() => [...data.books].sort((a, b) => parseViews(b.views) - parseViews(a.views)).slice(0, 5), [data.books]);
   const maxViews = Math.max(1, ...topBooks.map((item) => parseViews(item.views)));
   const recentBooks = useMemo(() => [...data.books].sort((a, b) => new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0)).slice(0, 3), [data.books]);
-  const pendingReviews = data.reviews.filter((item) => item.status === 'pending');
+  const recentReviews = useMemo(() => [...data.reviews].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)).slice(0, 3), [data.reviews]);
   const deposits = data.transactions.filter((item) => item.type === 'deposit' && item.status === 'success');
   const totalRevenue = deposits.reduce((sum, item) => sum + Number(item.amount || 0), 0);
   const totalCoins = deposits.reduce((sum, item) => sum + Number(item.coin || 0), 0);
@@ -58,15 +61,15 @@ export default function AdminDashboard() {
         </View>
 
         <View style={styles.statsGrid}>
-          <StatCard title="Tổng truyện" value={data.books.length} icon="library-outline" style={styles.stat} />
-          <StatCard title="Tổng chương" value={data.chapters.length} icon="documents-outline" color="#176b87" style={styles.stat} />
-          <StatCard title="Người dùng" value={data.users.length} icon="people-outline" color="#277143" style={styles.stat} />
-          <StatCard title="Giao dịch" value={data.transactions.length} icon="wallet-outline" color="#9a5b13" style={styles.stat} />
+          <StatCard title="Tổng truyện" value={data.books.length} icon="library-outline" style={styles.stat} onPress={() => router.push('/admin/truyen')} />
+          <StatCard title="Tổng chương" value={data.chapters.length} icon="documents-outline" color="#176b87" style={styles.stat} onPress={() => router.push('/admin/chuong')} />
+          <StatCard title="Người dùng" value={data.users.length} icon="people-outline" color="#277143" style={styles.stat} onPress={() => router.push('/admin/nguoi-dung')} />
+          <StatCard title="Giao dịch" value={data.transactions.length} icon="wallet-outline" color="#9a5b13" style={styles.stat} onPress={() => router.push('/admin/giao-dich')} />
         </View>
         <Card style={styles.revenue}>
-          <View><Text style={styles.revenueLabel}>TỔNG XU ĐÃ NẠP</Text><Text style={styles.revenueValue}>{totalCoins.toLocaleString('vi-VN')} xu</Text></View>
+          <View style={{ flex: 1, alignItems: 'center' }}><Text style={styles.revenueLabel} numberOfLines={1} adjustsFontSizeToFit>TỔNG XU ĐÃ NẠP</Text><Text style={styles.revenueValue}>{totalCoins.toLocaleString('vi-VN')} xu</Text></View>
           <View style={styles.revenueDivider} />
-          <View><Text style={styles.revenueLabel}>DOANH THU MÔ PHỎNG</Text><Text style={styles.revenueValue}>{totalRevenue.toLocaleString('vi-VN')}đ</Text></View>
+          <View style={{ flex: 1, alignItems: 'center' }}><Text style={styles.revenueLabel} numberOfLines={1} adjustsFontSizeToFit>DOANH THU MÔ PHỎNG</Text><Text style={styles.revenueValue}>{totalRevenue.toLocaleString('vi-VN')}đ</Text></View>
         </Card>
 
         <SectionHeader title="Thao tác nhanh" />
@@ -104,8 +107,17 @@ export default function AdminDashboard() {
         <SectionHeader title="Truyện thêm gần đây" action="Quản lý" onPress={() => router.push('/admin/truyen')} />
         {recentBooks.map((book) => <Card key={book.id} style={styles.bookRow} onPress={() => router.push({ pathname: '/admin/truyen/chinh-sua', params: { id: book.id } })}><Image source={{ uri: book.cover }} style={styles.cover} /><View style={{ flex: 1 }}><Text style={styles.bookTitle}>{book.title}</Text><Text style={styles.bookMeta}>{book.author} · {formatDisplayDate(book.publishedAt)}</Text></View><StatusBadge status={book.status} /></Card>)}
 
-        <SectionHeader title="Đánh giá chờ duyệt" action="Kiểm duyệt" onPress={() => router.push('/admin/danh-gia')} />
-        {pendingReviews.length ? pendingReviews.slice(0, 3).map((review) => <Card key={review.id} style={{ marginBottom: spacing.md }}><Text style={styles.bookTitle}>{review.userName} · {review.rating}★</Text><Text style={styles.subtitle}>{review.content}</Text></Card>) : <Card><Text style={styles.allClear}>✓ Không có đánh giá nào đang chờ duyệt.</Text></Card>}
+        <SectionHeader title="Đánh giá mới nhất" action="Xem tất cả" onPress={() => router.push('/admin/danh-gia')} />
+        {recentReviews.length ? recentReviews.map((review) => (
+          <Card key={review.id} style={{ marginBottom: spacing.md }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <Text style={styles.bookTitle}>{review.userName}</Text>
+              <Text style={{ color: '#f5c518', fontWeight: '800' }}>{'★'.repeat(review.rating)}</Text>
+            </View>
+            <Text style={styles.subtitle} numberOfLines={2}>{review.content}</Text>
+            <Text style={styles.bookMeta}>{formatDisplayDate(review.createdAt, true)}</Text>
+          </Card>
+        )) : <Card><Text style={styles.allClear}>Chưa có đánh giá nào.</Text></Card>}
 
         <SectionHeader title="Tất cả module" />
         <View style={styles.moduleGrid}>{modules.map(([label, icon, route]) => <Card key={label} style={styles.module} onPress={() => router.push(route)}><Ionicons name={icon} size={24} color={colors.tertiary} /><Text style={styles.moduleLabel}>{label}</Text></Card>)}</View>
@@ -114,7 +126,7 @@ export default function AdminDashboard() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   content: { padding: spacing.xl, paddingBottom: 110 },
   welcome: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginBottom: spacing.xl },
   eyebrow: { ...typography.caption, color: colors.tertiary, fontWeight: '900', letterSpacing: 1 },

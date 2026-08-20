@@ -1,2 +1,5 @@
 import { ChapterForm } from '../../../components/admin/AdminForms';
-export default function AddChapter() { return <ChapterForm />; }
+import { useTheme } from '../../../hooks/useTheme';
+export default function AddChapter() {
+  const { colors } = useTheme();
+ return <ChapterForm />; }

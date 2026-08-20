@@ -1,19 +1,39 @@
-import {
-  mockArticles,
-  mockBooks,
-  mockChapters,
-  mockReadingProgress,
-  mockReviews,
-  mockSavedBooks,
-  mockTransactions,
-  mockUsers,
-} from '../data/books';
 import localStorageService from './localStorageService';
 import { STORAGE_KEYS } from './storageKeys';
+import {
+  loginUser,
+  registerUser as registerUserApi,
+  fetchStories,
+  fetchStoryDetail,
+  fetchChapterDetail,
+  upgradeUserVip as upgradeUserVipApi,
+  unlockChapter,
+  fetchTransactions,
+  fetchTransactionDetail,
+  topupCoins,
+  fetchUserProfile,
+  fetchAdminStats,
+  fetchAdminUsers,
+  toggleUserStatusApi,
+  adjustUserCoinsApi,
+  createStoryApi,
+  updateStoryApi,
+  deleteStoryApi,
+  fetchAdminChapters,
+  createChapterApi,
+  updateChapterApi,
+  deleteChapterApi,
+  moveChapterApi,
+  updateTransactionStatusApi,
+  fetchReviewsApi,
+  createReviewApi,
+  updateReviewApi,
+  deleteReviewApi,
+} from '../constants/api';
 import { articleRepository } from './repositories/articleRepository';
 import { bookRepository } from './repositories/bookRepository';
 import { chapterRepository } from './repositories/chapterRepository';
-import { reviewRepository } from './repositories/reviewRepository';
+// reviewRepository removed
 import { transactionRepository } from './repositories/transactionRepository';
 import { userRepository } from './repositories/userRepository';
 
@@ -77,6 +97,39 @@ const createDefaultNotifications = (userId) => [
   },
 ];
 
+const mapBackendBookToFrontend = (b) => {
+  if (!b) return null;
+  return {
+    id: String(b.id),
+    title: b.tieu_de || '',
+    author: b.tac_gia || '',
+    categories: b.the_loai || [],
+    category: b.the_loai && b.the_loai.length > 0 ? b.the_loai[0] : 'Viễn tưởng',
+    rating: Number(b.diem_danh_gia || 0),
+    views: b.luot_doc !== undefined ? String(b.luot_doc) : '0',
+    status: b.trang_thai || 'Đang ra',
+    featured: b.featured || false,
+    cover: b.anh_bia_url || '',
+    description: b.mo_ta || '',
+    publishedAt: b.ngay_tao ? b.ngay_tao.split('T')[0] : '2025-01-01',
+    chaptersCount: b.so_chuong || 0,
+  };
+};
+
+const mapBackendChapterToFrontend = (c, bookId) => {
+  if (!c) return null;
+  return {
+    id: String(c.id),
+    bookId: String(bookId || c.bookId),
+    number: c.so_thu_tu_chuong || c.number || 0,
+    title: c.tieu_de || c.title || '',
+    content: c.noi_dung || c.content || '',
+    locked: c.co_khoa !== undefined ? Boolean(c.co_khoa) : Boolean(c.locked),
+    coinPrice: c.xu_yeu_cau !== undefined ? Number(c.xu_yeu_cau) : Number(c.coinPrice || 0),
+    publishedAt: c.publishedAt || '2025-01-01',
+  };
+};
+
 export const generateLocalId = (prefix = 'id') =>
   `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
@@ -115,15 +168,15 @@ export const initLocalData = async (forceReset = false) => {
   }
 
   await localStorageService.setMany([
-    [STORAGE_KEYS.USERS, mockUsers],
-    [STORAGE_KEYS.BOOKS, mockBooks],
-    [STORAGE_KEYS.CHAPTERS, mockChapters],
-    [STORAGE_KEYS.SAVED_BOOKS, mockSavedBooks],
-    [STORAGE_KEYS.READING_PROGRESS, mockReadingProgress],
+    [STORAGE_KEYS.USERS, []],
+    [STORAGE_KEYS.BOOKS, []],
+    [STORAGE_KEYS.CHAPTERS, []],
+    [STORAGE_KEYS.SAVED_BOOKS, []],
+    [STORAGE_KEYS.READING_PROGRESS, []],
     [STORAGE_KEYS.PURCHASED_CHAPTERS, []],
-    [STORAGE_KEYS.REVIEWS, mockReviews],
-    [STORAGE_KEYS.TRANSACTIONS, mockTransactions],
-    [STORAGE_KEYS.ARTICLES, mockArticles],
+    [STORAGE_KEYS.REVIEWS, []],
+    [STORAGE_KEYS.TRANSACTIONS, []],
+    [STORAGE_KEYS.ARTICLES, []],
     [STORAGE_KEYS.ARTICLE_FAVORITES, []],
     [STORAGE_KEYS.READER_SETTINGS, DEFAULT_READER_SETTINGS],
     [STORAGE_KEYS.APP_SETTINGS, DEFAULT_APP_SETTINGS],
@@ -142,9 +195,9 @@ export const resetToDefaultData = () => initLocalData(true);
 
 export const restoreDemoContent = async () => {
   await localStorageService.setMany([
-    [STORAGE_KEYS.BOOKS, mockBooks],
-    [STORAGE_KEYS.CHAPTERS, mockChapters],
-    [STORAGE_KEYS.ARTICLES, mockArticles],
+    [STORAGE_KEYS.BOOKS, []],
+    [STORAGE_KEYS.CHAPTERS, []],
+    [STORAGE_KEYS.ARTICLES, []],
   ]);
 };
 
@@ -152,7 +205,33 @@ export const restoreDemoContent = async () => {
 export const getCurrentUser = () => localStorageService.get(STORAGE_KEYS.CURRENT_USER, null);
 export const setCurrentUser = (user) => localStorageService.set(STORAGE_KEYS.CURRENT_USER, user);
 export const logout = () => localStorageService.remove(STORAGE_KEYS.CURRENT_USER);
-export const getUsers = () => userRepository.list();
+export const getUsers = async () => {
+  const currentUser = await getCurrentUser();
+  if (currentUser && currentUser.token) {
+    try {
+      const res = await fetchAdminUsers(currentUser.token);
+      if (res.success && res.results) {
+        const mappedUsers = res.results.map((u) => ({
+          id: String(u.id),
+          name: u.ho_ten,
+          email: u.email,
+          role: u.vai_tro,
+          coinBalance: Number(u.so_du_xu),
+          status: u.trang_thai,
+          createdAt: u.ngay_tao,
+          avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=150',
+        }));
+        for (const u of mappedUsers) {
+          await userRepository.save(u);
+        }
+        return mappedUsers;
+      }
+    } catch (err) {
+      console.error('getUsers API failed, falling back to local userRepository:', err);
+    }
+  }
+  return userRepository.list();
+};
 
 export const getRememberedEmail = () => localStorageService.get(STORAGE_KEYS.REMEMBERED_EMAIL, '');
 
@@ -164,43 +243,82 @@ export const setRememberedEmail = (email) => {
 };
 
 export const login = async (email, password, remember = false) => {
-  const user = await userRepository.findByEmail(email.trim());
-  if (!user) {
-    return { success: false, field: 'email', code: 'EMAIL_NOT_FOUND', message: 'Không tìm thấy tài khoản với email này.' };
+  try {
+    const res = await loginUser(email, password);
+    if (res.success && res.user) {
+      const user = {
+        id: String(res.user.id),
+        name: res.user.ho_ten,
+        email: res.user.email,
+        role: res.user.vai_tro || (res.user.email.includes('admin') ? 'admin' : 'user'),
+        coinBalance: Number(res.user.so_du_xu || 0),
+        isVip: Boolean(res.user.is_vip),
+        vipExpiresAt: res.user.vip_expires_at || null,
+        avatar: '',
+        status: res.user.trang_thai || 'active',
+        createdAt: res.user.ngay_tao,
+        token: res.user.api_token,
+      };
+      await userRepository.save(user);
+      await setCurrentUser(user);
+      await setRememberedEmail(remember ? user.email : '');
+      return { success: true, user };
+    } else {
+      return { success: false, message: res.message || 'Mật khẩu không chính xác.' };
+    }
+  } catch (err) {
+    console.error('Backend login failed:', err);
+    return { success: false, message: err.message || 'Không thể kết nối đến máy chủ backend.' };
   }
-  if (user.status === 'disabled' || user.status === 'blocked' || user.status === 'locked') {
-    return { success: false, field: 'email', code: 'ACCOUNT_LOCKED', message: 'Tài khoản đã bị khóa. Vui lòng liên hệ quản trị viên.' };
-  }
-  if (user.password !== password) {
-    return { success: false, field: 'password', code: 'WRONG_PASSWORD', message: 'Mật khẩu không chính xác.' };
-  }
-  await setCurrentUser(user);
-  await setRememberedEmail(remember ? user.email : '');
-  return { success: true, user };
 };
 
 export const registerUser = async ({ name, email, password }) => {
-  if (await userRepository.findByEmail(email.trim())) {
-    return { success: false, message: 'Email này đã được sử dụng.' };
+  try {
+    const res = await registerUserApi(name, email, password);
+    if (res.success && res.user) {
+      const user = {
+        id: String(res.user.id),
+        name: res.user.ho_ten,
+        email: res.user.email,
+        role: res.user.vai_tro || 'user',
+        coinBalance: Number(res.user.so_du_xu || 0),
+        isVip: Boolean(res.user.is_vip),
+        vipExpiresAt: res.user.vip_expires_at || null,
+        avatar: '',
+        status: res.user.trang_thai || 'active',
+        createdAt: res.user.ngay_tao,
+        token: res.user.api_token,
+      };
+      await userRepository.save(user);
+      await setCurrentUser(user);
+      await setRememberedEmail('');
+      return { success: true, user };
+    } else {
+      return { success: false, message: res.message || 'Lỗi đăng ký.' };
+    }
+  } catch (err) {
+    console.error('Backend register failed:', err);
+    return { success: false, message: err.message || 'Không thể kết nối đến máy chủ backend.' };
   }
-  const user = {
-    id: generateLocalId('u'),
-    name: name.trim(),
-    email: email.trim().toLowerCase(),
-    password,
-    role: 'user',
-    coinBalance: 0,
-    avatar: '',
-    status: 'active',
-    createdAt: formatIsoDate(),
-  };
-  await userRepository.save(user);
-  await setCurrentUser(user);
-  await setRememberedEmail('');
-  return { success: true, user };
 };
 
 export const saveUser = async (userData) => {
+  const currentUser = await getCurrentUser();
+  if (currentUser && currentUser.token && userData.id) {
+    try {
+      const localUser = await userRepository.findById(userData.id);
+      if (localUser && localUser.status !== userData.status) {
+        const res = await toggleUserStatusApi(userData.id, currentUser.token);
+        if (res.success) {
+          const updatedUser = { ...userData, status: res.status };
+          await userRepository.save(updatedUser);
+          return updatedUser;
+        }
+      }
+    } catch (err) {
+      console.error('saveUser status toggle API failed:', err);
+    }
+  }
   const item = { ...userData, id: userData.id || generateLocalId('u') };
   await userRepository.save(item);
   return item;
@@ -263,6 +381,32 @@ export const adjustUserCoinBalance = async ({ userId, amountChange, reason, admi
   if (!String(reason || '').trim()) {
     return { success: false, message: 'Vui lòng nhập lý do điều chỉnh.' };
   }
+
+  const currentUser = await getCurrentUser();
+  if (currentUser && currentUser.token) {
+    try {
+      const res = await adjustUserCoinsApi({ userId, amount, reason }, currentUser.token);
+      if (res.success) {
+        const balance = Number(res.balance);
+        const localUser = await userRepository.findById(userId);
+        if (localUser) {
+          await userRepository.save({ ...localUser, coinBalance: balance });
+        }
+        const adjustment = {
+          id: generateLocalId('adjustment'), userId, adminId, amount,
+          reason: String(reason).trim(), balanceAfter: balance, createdAt: formatIsoDate(),
+        };
+        const items = await localStorageService.get(STORAGE_KEYS.COIN_ADJUSTMENTS, []);
+        await localStorageService.set(STORAGE_KEYS.COIN_ADJUSTMENTS, [adjustment, ...items]);
+        return { success: true, balance, adjustment };
+      } else {
+        return { success: false, message: res.message || 'Không thể điều chỉnh số dư xu.' };
+      }
+    } catch (err) {
+      console.error('adjustUserCoinBalance API failed:', err);
+    }
+  }
+
   const user = await userRepository.findById(userId);
   if (!user) return { success: false, message: 'Không tìm thấy người dùng.' };
   if (Number(user.coinBalance || 0) + amount < 0) {
@@ -283,13 +427,64 @@ export const adjustUserCoinBalance = async ({ userId, amountChange, reason, admi
 };
 
 // Sách
-export const getAdminBooks = () => bookRepository.list();
-export const getBooks = async () => {
-  const books = await bookRepository.list();
-  return books.filter((book) => book.status !== 'Bản nháp' && book.status !== 'draft');
+export const getAdminBooks = async () => {
+  try {
+    const res = await fetchStories();
+    if (res.success && res.results) {
+      return res.results.map(mapBackendBookToFrontend);
+    }
+  } catch (err) {
+    console.error('getAdminBooks API failed:', err);
+  }
+  return [];
 };
-export const getBookById = (id) => bookRepository.findById(id);
+
+export const getBooks = async () => {
+  try {
+    const res = await fetchStories();
+    if (res.success && res.results) {
+      const books = res.results.map(mapBackendBookToFrontend);
+      return books.filter((book) => book.status !== 'Bản nháp' && book.status !== 'draft');
+    }
+  } catch (err) {
+    console.error('getBooks API failed:', err);
+  }
+  return [];
+};
+
+export const getBookById = async (id) => {
+  try {
+    if (id && (!isNaN(id) || /^\d+$/.test(id))) {
+      const res = await fetchStoryDetail(id);
+      if (res.success && res.story) {
+        return mapBackendBookToFrontend(res.story);
+      }
+    }
+  } catch (err) {
+    console.error('getBookById API failed:', err);
+  }
+  return null;
+};
 export const saveBook = async (bookData) => {
+  const currentUser = await getCurrentUser();
+  if (currentUser && currentUser.token) {
+    try {
+      let res;
+      if (bookData.id && !bookData.id.startsWith('b_')) {
+        res = await updateStoryApi(bookData.id, bookData, currentUser.token);
+      } else {
+        res = await createStoryApi(bookData, currentUser.token);
+      }
+      if (res.success && res.story) {
+        const item = mapBackendBookToFrontend(res.story);
+        await bookRepository.save(item);
+        return item;
+      }
+    } catch (err) {
+      console.error('saveBook API failed:', err);
+    }
+  }
+
   const item = {
     rating: 5,
     views: '0',
@@ -302,8 +497,31 @@ export const saveBook = async (bookData) => {
   await bookRepository.save(item);
   return item;
 };
-export const deleteBook = (id) => bookRepository.remove(id);
+export const deleteBook = async (id) => {
+  const currentUser = await getCurrentUser();
+  if (currentUser && currentUser.token && id && !id.startsWith('b_')) {
+    try {
+      const res = await deleteStoryApi(id, currentUser.token);
+      if (res.success) {
+        await bookRepository.remove(id);
+        return true;
+      }
+    } catch (err) {
+      console.error('deleteBook API failed:', err);
+    }
+  }
+  await bookRepository.remove(id);
+  return true;
+};
 export const deleteBookWithChapters = async (id) => {
+  const currentUser = await getCurrentUser();
+  if (currentUser && currentUser.token && id && !id.startsWith('b_')) {
+    try {
+      await deleteStoryApi(id, currentUser.token);
+    } catch (err) {
+      console.error('deleteBookWithChapters API failed:', err);
+    }
+  }
   const chapters = await chapterRepository.list();
   const related = chapters.filter((item) => String(item.bookId) === String(id));
   await bookRepository.remove(id);
@@ -315,14 +533,75 @@ export const deleteBookWithChapters = async (id) => {
 };
 
 // Chương
-export const getAdminChapters = (bookId = null) =>
-  bookId ? chapterRepository.listByBook(bookId) : chapterRepository.list();
-export const getChapters = async (bookId = null) => {
-  const chapters = bookId ? await chapterRepository.listByBook(bookId) : await chapterRepository.list();
-  return chapters.filter((chapter) => chapter.status !== 'draft');
+export const getAdminChapters = async (bookId = null) => {
+  const currentUser = await getCurrentUser();
+  if (currentUser && currentUser.token) {
+    try {
+      const res = await fetchAdminChapters(bookId, currentUser.token);
+      if (res.success && res.results) {
+        const mappedChapters = res.results.map((c) => mapBackendChapterToFrontend(c, bookId || c.bookId));
+        for (const c of mappedChapters) {
+          await chapterRepository.save(c);
+        }
+        return mappedChapters;
+      }
+    } catch (err) {
+      console.error('getAdminChapters API failed:', err);
+    }
+  }
+  if (bookId) {
+    return getChapters(bookId);
+  }
+  return [];
 };
-export const getChapterById = (id) => chapterRepository.findById(id);
+export const getChapters = async (bookId = null) => {
+  if (bookId && (!isNaN(bookId) || /^\d+$/.test(bookId))) {
+    try {
+      const res = await fetchStoryDetail(bookId);
+      if (res.success && res.story && res.story.chuongs) {
+        return res.story.chuongs.map((c) => mapBackendChapterToFrontend(c, bookId));
+      }
+    } catch (err) {
+      console.error('getChapters API failed:', err);
+    }
+  }
+  return [];
+};
+export const getChapterById = async (id) => {
+  if (id && (!isNaN(id) || /^\d+$/.test(id))) {
+    try {
+      const currentUser = await getCurrentUser();
+      const token = currentUser?.token || null;
+      const res = await fetchChapterDetail(id, token);
+      if (res.success && res.chapter) {
+        return mapBackendChapterToFrontend(res.chapter);
+      }
+    } catch (err) {
+      console.error('getChapterById API failed:', err);
+    }
+  }
+  return null;
+};
 export const saveChapter = async (chapterData) => {
+  const currentUser = await getCurrentUser();
+  if (currentUser && currentUser.token) {
+    try {
+      let res;
+      if (chapterData.id && !chapterData.id.startsWith('c_')) {
+        res = await updateChapterApi(chapterData.id, chapterData, currentUser.token);
+      } else {
+        res = await createChapterApi(chapterData, currentUser.token);
+      }
+      if (res.success && res.chapter) {
+        const item = mapBackendChapterToFrontend(res.chapter, chapterData.bookId);
+        await chapterRepository.save(item);
+        return item;
+      }
+    } catch (err) {
+      console.error('saveChapter API failed:', err);
+    }
+  }
+
   const item = {
     locked: false,
     coinPrice: 0,
@@ -333,9 +612,36 @@ export const saveChapter = async (chapterData) => {
   await chapterRepository.save(item);
   return item;
 };
-export const deleteChapter = (id) => chapterRepository.remove(id);
+export const deleteChapter = async (id) => {
+  const currentUser = await getCurrentUser();
+  if (currentUser && currentUser.token && id && !id.startsWith('c_')) {
+    try {
+      const res = await deleteChapterApi(id, currentUser.token);
+      if (res.success) {
+        await chapterRepository.remove(id);
+        return true;
+      }
+    } catch (err) {
+      console.error('deleteChapter API failed:', err);
+    }
+  }
+  await chapterRepository.remove(id);
+  return true;
+};
 
 export const moveChapter = async (bookId, chapterId, direction) => {
+  const currentUser = await getCurrentUser();
+  if (currentUser && currentUser.token && chapterId && !chapterId.startsWith('c_')) {
+    try {
+      const res = await moveChapterApi(chapterId, direction, currentUser.token);
+      if (res.success) {
+        return await getAdminChapters(bookId);
+      }
+    } catch (err) {
+      console.error('moveChapter API failed:', err);
+    }
+  }
+
   const chapters = await chapterRepository.listByBook(bookId);
   const index = chapters.findIndex((item) => String(item.id) === String(chapterId));
   const targetIndex = direction === 'up' ? index - 1 : index + 1;
@@ -394,8 +700,58 @@ export const getPurchasedChapterIds = async (userId) => {
 
 export const isChapterUnlocked = async (userId, chapter) => {
   if (!chapter?.locked) return true;
+  const user = await getCurrentUser();
+  if (user && user.isVip) return true;
   const purchasedIds = await getPurchasedChapterIds(userId);
   return purchasedIds.includes(String(chapter.id));
+};
+
+export const upgradeVip = async () => {
+  const user = await getCurrentUser();
+  if (!user) return { success: false, message: 'Yêu cầu đăng nhập để nâng cấp VIP.' };
+
+  try {
+    if (user.token) {
+      const res = await upgradeUserVipApi(user.token);
+      if (res.success && res.user) {
+        user.isVip = Boolean(res.user.is_vip);
+        user.coinBalance = Number(res.user.so_du_xu);
+        user.vipExpiresAt = res.user.vip_expires_at || null;
+        await userRepository.save(user);
+        await setCurrentUser(user);
+        return { success: true, user };
+      } else {
+        return { success: false, message: res.message || 'Lỗi nâng cấp VIP.' };
+      }
+    } else {
+      return { success: false, message: 'Yêu cầu tài khoản đăng nhập qua hệ thống để nâng cấp VIP.' };
+    }
+  } catch (err) {
+    console.error('Backend VIP upgrade failed:', err);
+    return { success: false, message: err.message || 'Không thể kết nối đến máy chủ backend.' };
+  }
+};
+
+export const syncUserProfile = async () => {
+  const currentUser = await getCurrentUser();
+  if (currentUser && currentUser.token) {
+    try {
+      const res = await fetchUserProfile(currentUser.token);
+      if (res.success && res.user) {
+        currentUser.name = res.user.ho_ten;
+        currentUser.email = res.user.email;
+        currentUser.coinBalance = Number(res.user.so_du_xu || 0);
+        currentUser.isVip = Boolean(res.user.is_vip);
+        currentUser.vipExpiresAt = res.user.vip_expires_at || null;
+        await userRepository.save(currentUser);
+        await setCurrentUser(currentUser);
+        return currentUser;
+      }
+    } catch (err) {
+      console.error('syncUserProfile error:', err);
+    }
+  }
+  return currentUser;
 };
 
 export const purchaseChapter = async (userId, chapter) => {
@@ -404,39 +760,53 @@ export const purchaseChapter = async (userId, chapter) => {
     return { success: true, alreadyUnlocked: true };
   }
 
-  const user = await userRepository.findById(userId);
-  const price = Number(chapter.coinPrice || 0);
-  if (!user || Number(user.coinBalance || 0) < price) {
-    return {
-      success: false,
-      code: 'INSUFFICIENT_COINS',
-      balance: Number(user?.coinBalance || 0),
-      required: price,
-    };
+  const currentUser = await getCurrentUser();
+  if (currentUser && currentUser.token) {
+    try {
+      const res = await unlockChapter(chapter.id, currentUser.token);
+      if (res.success) {
+        currentUser.coinBalance = Number(res.so_du_xu);
+        await setCurrentUser(currentUser);
+        await userRepository.save(currentUser);
+
+        // Đồng bộ local purchases phòng khi cần sử dụng offline
+        const purchasedItems = await localStorageService.get(STORAGE_KEYS.PURCHASED_CHAPTERS, []);
+        if (!purchasedItems.some(item => String(item.chapterId) === String(chapter.id) && String(item.userId) === String(userId))) {
+          purchasedItems.push({
+            userId,
+            chapterId: chapter.id,
+            bookId: chapter.bookId,
+            coinPrice: Number(chapter.coinPrice || 0),
+            purchasedAt: formatIsoDate(),
+          });
+          await localStorageService.set(STORAGE_KEYS.PURCHASED_CHAPTERS, purchasedItems);
+        }
+
+        return { success: true, balance: currentUser.coinBalance };
+      } else {
+        if (res.message && (res.message.includes('không đủ') || res.message.includes('không đủ để mở khoá') || res.message.includes('Số dư xu không đủ'))) {
+          return {
+            success: false,
+            code: 'INSUFFICIENT_COINS',
+            balance: currentUser.coinBalance,
+            required: Number(chapter.coinPrice || 0),
+          };
+        }
+        return { success: false, message: res.message || 'Mở khóa chương thất bại.' };
+      }
+    } catch (err) {
+      console.error('purchaseChapter API error:', err);
+      return { success: false, message: err.message || 'Không thể kết nối đến máy chủ backend để mở khóa chương.' };
+    }
   }
 
-  const purchasedItems = await localStorageService.get(STORAGE_KEYS.PURCHASED_CHAPTERS, []);
-  purchasedItems.push({
-    userId,
-    chapterId: chapter.id,
-    bookId: chapter.bookId,
-    coinPrice: price,
-    purchasedAt: formatIsoDate(),
-  });
-  await localStorageService.set(STORAGE_KEYS.PURCHASED_CHAPTERS, purchasedItems);
-  const balance = await updateUserCoinBalance(userId, -price);
-  await addTransaction({
-    userId,
-    type: 'chapter_purchase',
-    amount: -price,
-    description: `Mở khóa chương ${chapter.number}: ${chapter.title}`,
-  });
-  return { success: true, balance };
+  return { success: false, message: 'Yêu cầu đăng nhập để mua chương.' };
 };
 
 // Tiến độ đọc và cài đặt trình đọc
 export const getReadingProgress = async (userId, bookId) => {
   const items = await localStorageService.get(STORAGE_KEYS.READING_PROGRESS, []);
+  if (!userId && !bookId) return items;
   return items.find(
     (item) => String(item.userId) === String(userId) && String(item.bookId) === String(bookId)
   ) || null;
@@ -529,27 +899,42 @@ export const getAccountStats = async (userId) => {
 };
 
 // Đánh giá
-export const getReviews = (bookId = null) =>
-  bookId ? reviewRepository.listByBook(bookId) : reviewRepository.list();
-export const addReview = async (reviewData) => {
-  const item = {
-    status: 'pending',
-    ...reviewData,
-    id: reviewData.id || generateLocalId('r'),
-    createdAt: reviewData.createdAt || formatIsoDate(),
-  };
-  await reviewRepository.save(item);
-  return item;
+const mapReviewApiToLocal = (item) => ({
+  ...item,
+  id: item.id,
+  bookId: item.sach,
+  userId: item.nguoi_dung,
+  rating: item.rating,
+  content: item.content,
+  status: item.status,
+  createdAt: item.created_at,
+  updatedAt: item.updated_at,
+  userName: item.user_name || 'Người dùng',
+  userAvatar: 'https://ui-avatars.com/api/?name=' + (item.user_name || 'U'),
+});
+
+export const getReviews = async (bookId = null) => {
+  const result = await fetchReviewsApi(bookId);
+  return result?.success && result.results ? result.results.map(mapReviewApiToLocal) : [];
 };
-export const deleteReview = (id) => reviewRepository.remove(id);
-export const updateReview = async (id, changes) => {
-  const current = await reviewRepository.findById(id);
-  if (!current) return null;
-  const updated = { ...current, ...changes, id: current.id, updatedAt: formatIsoDate() };
-  await reviewRepository.save(updated);
-  return updated;
+export const addReview = async (reviewData, token) => {
+  const result = await createReviewApi(reviewData, token);
+  if (result?.success) return mapReviewApiToLocal(result.data || result);
+  console.error("Lỗi thêm đánh giá", result);
+  return null;
 };
-export const hideReview = (id) => updateReview(id, { status: 'hidden' });
+export const deleteReview = async (id, token) => {
+  return await deleteReviewApi(id, token);
+};
+export const updateReview = async (id, changes, token) => {
+  const result = await updateReviewApi(id, changes, token);
+  if (result?.success) return mapReviewApiToLocal(result.data || result);
+  console.error("Lỗi cập nhật đánh giá", result);
+  return null;
+};
+export const hideReview = (id, token) => updateReview(id, { status: 'hidden' }, token);
+
+
 
 // Tin tức
 export const getArticles = () => articleRepository.list();
@@ -579,9 +964,51 @@ export const toggleFavoriteArticle = async (userId, articleId) => {
 };
 
 // Giao dịch
-export const getTransactions = (userId = null) =>
-  userId ? transactionRepository.listByUser(userId) : transactionRepository.list();
-export const getTransactionById = (id) => transactionRepository.findById(id);
+export const getTransactions = async (userId = null) => {
+  const currentUser = await getCurrentUser();
+  if (currentUser && currentUser.token) {
+    try {
+      const res = await fetchTransactions(currentUser.token);
+      if (res.success && res.results) {
+        // Đồng bộ dữ liệu giao dịch về local repository phòng khi offline
+        for (const tx of res.results) {
+          await transactionRepository.save({
+            id: tx.id,
+            userId: tx.userId || currentUser.id,
+            type: tx.type,
+            coin: tx.coin,
+            amount: tx.amount,
+            status: tx.status,
+            method: tx.method,
+            createdAt: tx.createdAt,
+            description: tx.description,
+            bonus: tx.bonus,
+            balanceAfter: tx.balanceAfter,
+          });
+        }
+        return res.results;
+      }
+    } catch (err) {
+      console.error('getTransactions API error, using local fallback:', err);
+    }
+  }
+  return userId ? transactionRepository.listByUser(userId) : transactionRepository.list();
+};
+
+export const getTransactionById = async (id) => {
+  const currentUser = await getCurrentUser();
+  if (currentUser && currentUser.token) {
+    try {
+      const res = await fetchTransactionDetail(id, currentUser.token);
+      if (res.success && res.transaction) {
+        return res.transaction;
+      }
+    } catch (err) {
+      console.error('getTransactionById API error, using local fallback:', err);
+    }
+  }
+  return transactionRepository.findById(id);
+};
 export const addTransaction = async (transactionData) => {
   const item = {
     status: 'success',
@@ -594,6 +1021,29 @@ export const addTransaction = async (transactionData) => {
 };
 
 export const updateTransactionStatus = async (id, status) => {
+  const currentUser = await getCurrentUser();
+  if (currentUser && currentUser.token && String(id).startsWith('dep-')) {
+    const pk = String(id).split('-')[1];
+    if (pk && !isNaN(pk)) {
+      try {
+        const res = await updateTransactionStatusApi(pk, status, currentUser.token);
+        if (res.success) {
+          const current = await transactionRepository.findById(id);
+          if (current) {
+            const updated = { ...current, status, updatedAt: formatIsoDate() };
+            await transactionRepository.save(updated);
+            return { success: true, transaction: updated, alreadyProcessed: false };
+          }
+          return { success: true, transaction: { id, status }, alreadyProcessed: false };
+        } else {
+          return { success: false, message: res.message || 'Lỗi cập nhật trạng thái giao dịch trên server.' };
+        }
+      } catch (err) {
+        console.error('updateTransactionStatus API failed:', err);
+      }
+    }
+  }
+
   const current = await transactionRepository.findById(id);
   if (!current) return { success: false, message: 'Không tìm thấy giao dịch.' };
   if (current.status === status) return { success: true, transaction: current, alreadyProcessed: true };
@@ -653,10 +1103,58 @@ export const completeCoinTopup = async ({
   if (topupLocks.has(id)) return topupLocks.get(id);
 
   const operation = (async () => {
+    const currentUser = await getCurrentUser();
+    if (currentUser && currentUser.token) {
+      try {
+        const res = await topupCoins({
+          transactionId: id,
+          coin: Number(coin),
+          bonus: Number(bonus),
+          price: Number(price),
+          method: method || 'MoMo',
+        }, currentUser.token);
+
+        if (res.success && res.transaction) {
+          // Sync local storage user balance
+          const updatedUser = {
+            ...currentUser,
+            coinBalance: Number(res.balance),
+          };
+          await userRepository.save(updatedUser);
+          await setCurrentUser(updatedUser);
+
+          // Save transaction locally for offline use
+          await transactionRepository.save({
+            id: id,
+            userId: currentUser.id,
+            type: 'deposit',
+            coin: Number(coin) + Number(bonus),
+            amount: Number(price),
+            status: 'success',
+            method: method || 'MoMo',
+            createdAt: res.transaction.createdAt || formatIsoDate(),
+            description: `Nạp ${coin} xu${bonus ? ` + ${bonus} xu thưởng` : ''}`,
+            bonus: Number(bonus),
+            balanceAfter: res.balance,
+          });
+
+          return {
+            transaction: res.transaction,
+            balance: res.balance,
+            alreadyProcessed: res.alreadyProcessed || false,
+          };
+        } else {
+          throw new Error(res.message || 'Không thể hoàn tất giao dịch trên máy chủ backend.');
+        }
+      } catch (err) {
+        console.error('completeCoinTopup API error, falling back to local storage:', err);
+      }
+    }
+
     const existing = await transactionRepository.findById(id);
     if (existing?.status === 'success') {
-      const currentUser = await userRepository.findById(userId);
-      return { transaction: existing, balance: Number(currentUser?.coinBalance || 0), alreadyProcessed: true };
+      const u = await userRepository.findById(userId);
+      return { transaction: existing, balance: Number(u?.coinBalance || 0), alreadyProcessed: true };
     }
 
     const baseCoin = Math.max(0, Number(coin) || 0);
@@ -728,15 +1226,15 @@ export const markAllNotificationsRead = async (userId) => {
 export const restoreDemoData = async () => {
   const current = await getCurrentUser();
   await localStorageService.setMany([
-    [STORAGE_KEYS.USERS, mockUsers],
-    [STORAGE_KEYS.BOOKS, mockBooks],
-    [STORAGE_KEYS.CHAPTERS, mockChapters],
-    [STORAGE_KEYS.SAVED_BOOKS, mockSavedBooks],
-    [STORAGE_KEYS.READING_PROGRESS, mockReadingProgress],
+    [STORAGE_KEYS.USERS, []],
+    [STORAGE_KEYS.BOOKS, []],
+    [STORAGE_KEYS.CHAPTERS, []],
+    [STORAGE_KEYS.SAVED_BOOKS, []],
+    [STORAGE_KEYS.READING_PROGRESS, []],
     [STORAGE_KEYS.PURCHASED_CHAPTERS, []],
-    [STORAGE_KEYS.REVIEWS, mockReviews],
-    [STORAGE_KEYS.TRANSACTIONS, mockTransactions],
-    [STORAGE_KEYS.ARTICLES, mockArticles],
+    [STORAGE_KEYS.REVIEWS, []],
+    [STORAGE_KEYS.TRANSACTIONS, []],
+    [STORAGE_KEYS.ARTICLES, []],
     [STORAGE_KEYS.ARTICLE_FAVORITES, []],
     [STORAGE_KEYS.SEARCH_HISTORY, []],
     [STORAGE_KEYS.READER_SETTINGS, DEFAULT_READER_SETTINGS],

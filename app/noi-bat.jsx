@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useMemo, useState, useCallback } from 'react';
+import { ScrollView, StyleSheet, Text, View, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   AppHeader,
@@ -30,10 +30,17 @@ export default function Featured() {
     return inCategory && text.includes(query.trim().toLowerCase());
   });
 
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await reload();
+    setRefreshing(false);
+  }, [reload]);
+
   return (
     <Screen padded={false} safeAreaTop={false}>
       <AppHeader title="Khám phá" onBack={() => router.back()} />
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>
         <Text style={styles.title}>Tìm câu chuyện dành cho bạn</Text>
         <SearchField value={query} onChangeText={setQuery} style={{ marginTop: spacing.lg }} />
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>

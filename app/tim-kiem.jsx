@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useState, useCallback } from 'react';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -97,10 +97,17 @@ export default function Search() {
   const openBook = (book) => router.push({ pathname: '/chi-tiet', params: { id: book.id } });
   const hasSearch = Boolean(query.trim()) || category !== 'Tất cả' || status !== 'Tất cả' || minRating > 0 || onlyNewest;
 
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await reload();
+    setRefreshing(false);
+  }, [reload]);
+
   return (
     <Screen padded={false} safeAreaTop={false}>
       <AppHeader title="Tìm kiếm" onBack={() => router.back()} />
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>
         <SearchField
           autoFocus
           value={query}

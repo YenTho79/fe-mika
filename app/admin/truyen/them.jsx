@@ -1,2 +1,5 @@
 import { BookForm } from '../../../components/admin/AdminForms';
-export default function AddBook() { return <BookForm />; }
+import { useTheme } from '../../../hooks/useTheme';
+export default function AddBook() {
+  const { colors } = useTheme();
+ return <BookForm />; }

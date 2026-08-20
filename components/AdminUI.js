@@ -1,14 +1,17 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useMemo } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, usePathname, useRouter } from 'expo-router';
 import { AppHeader, Card, ConfirmDialog, EmptyState, SearchField, StatusBadge } from './UI';
-import { colors, radius, shadow, spacing, typography } from '../constants/theme';
+import { radius, shadow, spacing, typography } from '../constants/theme';
+import { useTheme } from '../hooks/useTheme';
 import { getCurrentUser } from '../services/localDataService';
 
 export const FALLBACK_COVER = 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?q=80&w=800&auto=format&fit=crop';
 
 export function RoleGuard({ children }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
   const router = useRouter();
   const [state, setState] = useState({ loading: true, user: null });
 
@@ -53,6 +56,8 @@ export function AdminHeader({ title, subtitle, back = false, rightIcon, onRight 
 }
 
 export function AdminBottomNav() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
   const pathname = usePathname();
   const router = useRouter();
   const items = [
@@ -67,7 +72,7 @@ export function AdminBottomNav() {
       {items.map((item) => (
         <Pressable key={item.label} onPress={() => router.push(item.route)} style={styles.navItem}>
           <Ionicons name={item.icon} size={22} color={item.match ? colors.primary : colors.outline} />
-          <Text style={[styles.navLabel, item.match && styles.navLabelActive]}>{item.label}</Text>
+          <Text style={[styles.navLabel, item.match && styles.navLabelActive]} numberOfLines={1} adjustsFontSizeToFit>{item.label}</Text>
         </Pressable>
       ))}
     </View>
@@ -75,6 +80,8 @@ export function AdminBottomNav() {
 }
 
 export function AdminFormSection({ title, description, children, style }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
   return (
     <Card style={[styles.formSection, style]}>
       <Text style={styles.formTitle}>{title}</Text>
@@ -85,6 +92,8 @@ export function AdminFormSection({ title, description, children, style }) {
 }
 
 export function AdminSearchFilter({ value, onChangeText, placeholder, children }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
   return (
     <View style={styles.searchBlock}>
       <SearchField value={value} onChangeText={onChangeText} placeholder={placeholder} />
@@ -94,6 +103,8 @@ export function AdminSearchFilter({ value, onChangeText, placeholder, children }
 }
 
 export function AdminListItem({ image, icon = 'document-text-outline', title, subtitle, meta, status, statusLabel, children, onPress }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
   const [failed, setFailed] = useState(false);
   return (
     <Card style={styles.listCard} onPress={onPress}>
@@ -119,6 +130,8 @@ export const AdminEmptyState = EmptyState;
 export const ConfirmDeleteModal = (props) => <ConfirmDialog {...props} isDanger />;
 
 export function AdminPageTitle({ eyebrow, title, description, action }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
   return (
     <View style={styles.pageTitle}>
       <View style={{ flex: 1 }}>
@@ -131,14 +144,14 @@ export function AdminPageTitle({ eyebrow, title, description, action }) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   guard: { flex: 1, backgroundColor: colors.background, justifyContent: 'center' },
   nav: {
     position: 'absolute', left: 12, right: 12, bottom: 10, height: 66,
     borderRadius: 24, paddingHorizontal: spacing.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around',
     backgroundColor: 'rgba(23,31,51,0.98)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', ...shadow,
   },
-  navItem: { flex: 1, minWidth: 54, alignItems: 'center', gap: 3 },
+  navItem: { flex: 1, alignItems: 'center', gap: 3 },
   navLabel: { ...typography.caption, color: colors.outline, fontSize: 10, fontWeight: '700' },
   navLabelActive: { color: colors.primary },
   formSection: { marginBottom: spacing.lg },

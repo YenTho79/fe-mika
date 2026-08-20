@@ -1,18 +1,23 @@
+import { useTheme } from '../../hooks/useTheme';
 import { useCallback, useMemo, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { AdminHeader, AdminListItem, AdminPageTitle, AdminSearchFilter } from '../../components/AdminUI';
 import { BottomSheet, ConfirmDialog, EmptyState, FilterChip, PrimaryButton, Screen, SecondaryButton, TextField, Toast } from '../../components/UI';
-import { colors, radius, spacing, typography } from '../../constants/theme';
+import { radius, spacing, typography } from '../../constants/theme';
 import { adjustUserCoinBalance, getCurrentUser, getReadingProgressList, getSavedBooks, getTransactions, getUsers, saveUser } from '../../services/localDataService';
 
 function Action({ icon, label, onPress, danger }) {
-  return <Pressable onPress={onPress} style={[styles.action, danger && styles.danger]}><Ionicons name={icon} size={15} color={danger ? colors.danger : colors.primary} /><Text style={[styles.actionText, danger && { color: colors.danger }]}>{label}</Text></Pressable>;
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+return <Pressable onPress={onPress} style={[styles.action, danger && styles.danger]}><Ionicons name={icon} size={15} color={danger ? colors.danger : colors.primary} /><Text style={[styles.actionText, danger && { color: colors.danger }]}>{label}</Text></Pressable>;
 }
 
 export default function UserManagement() {
-  const [users, setUsers] = useState([]);
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+const [users, setUsers] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   const [query, setQuery] = useState('');
   const [role, setRole] = useState('all');
@@ -81,7 +86,7 @@ export default function UserManagement() {
           <View style={styles.profile}><Image source={{ uri: detail.user.avatar }} style={styles.avatar} /><View><Text style={styles.name}>{detail.user.name}</Text><Text style={styles.muted}>{detail.user.email}</Text></View></View>
           <View style={styles.detailStats}><DetailStat label="Truyện lưu" value={detail.saved.length} /><DetailStat label="Lịch sử đọc" value={detail.progress.length} /><DetailStat label="Giao dịch" value={detail.transactions.length} /></View>
           <Text style={styles.sectionTitle}>Đang đọc gần đây</Text>
-          {detail.progress.slice(0, 4).map((item) => <Text key={item.bookId} style={styles.detailLine}>• {item.bookId} · {item.percent || 0}%</Text>)}
+          {detail.progress.slice(0, 4).map((item) => <Text key={item.bookId} style={styles.detailLine}>• {item.bookId} · Chương {item.chapterId || 1}</Text>)}
           {!detail.progress.length ? <Text style={styles.muted}>Chưa có lịch sử đọc.</Text> : null}
         </ScrollView> : null}
       </BottomSheet>
@@ -97,11 +102,13 @@ export default function UserManagement() {
   );
 }
 
-function DetailStat({ label, value }) { return <View style={styles.detailStat}><Text style={styles.detailValue}>{value}</Text><Text style={styles.detailLabel}>{label}</Text></View>; }
+function DetailStat({ label, value }) {
+  const { colors } = useTheme();
+  const styles = getStyles(colors); return <View style={styles.detailStat}><Text style={styles.detailValue}>{value}</Text><Text style={styles.detailLabel}>{label}</Text></View>; }
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   content: { padding: spacing.xl, paddingBottom: 110 },
-  action: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.sm, paddingVertical: 6, borderRadius: radius.sm, backgroundColor: 'rgba(210,187,255,0.1)' },
+  action: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.sm, paddingVertical: 6, borderRadius: radius.sm, backgroundColor: colors.emptyCircleBg },
   danger: { backgroundColor: 'rgba(255,180,171,0.1)' },
   actionText: { ...typography.caption, color: colors.primary, fontWeight: '800' },
   profile: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.lg },
