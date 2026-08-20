@@ -10,14 +10,14 @@ const getDevServerIp = () => {
   if (hostUri) {
     return hostUri.split(':')[0].trim();
   }
-  return '192.168.69.86';
+  return '192.168.1.8';
 };
 
 const DEV_IP = getDevServerIp();
 
 // API Base URL Configuration
 export const API_BASE_URL = Platform.select({
-  web: 'http://192.168.69.86:8000/api',
+  web: 'http://192.168.1.8:8000/api',
   default: `http://${DEV_IP}:8000/api`,
 });
 

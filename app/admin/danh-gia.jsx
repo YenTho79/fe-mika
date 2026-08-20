@@ -6,8 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { AdminHeader, AdminListItem, AdminPageTitle, AdminSearchFilter, ConfirmDeleteModal } from '../../components/AdminUI';
 import { EmptyState, FilterChip, Screen, Toast } from '../../components/UI';
 import { radius, spacing, typography } from '../../constants/theme';
-import { deleteReview, formatDisplayDate, getAdminBooks, getReviews, updateReview } from '../../services/localDataService';
-import { useAuth } from '../../contexts/AuthContext';
+import { deleteReview, formatDisplayDate, getAdminBooks, getCurrentUser, getReviews, updateReview } from '../../services/localDataService';
 
 function Action({ icon, label, danger, onPress }) {
   const { colors } = useTheme();
@@ -18,7 +17,7 @@ export default function ReviewManagement() {
   const { colors } = useTheme();
   const styles = useMemo(() => getStyles(colors), [colors]);
 const router = useRouter();
-  const { user } = useAuth();
+  const [user, setUser] = useState(null);
   const [reviews, setReviews] = useState([]);
   const [books, setBooks] = useState([]);
   const [query, setQuery] = useState('');
@@ -27,9 +26,10 @@ const router = useRouter();
   const [pendingDelete, setPendingDelete] = useState(null);
   const [toast, setToast] = useState('');
   const load = useCallback(async () => {
-    const [items, bookItems] = await Promise.all([getReviews(), getAdminBooks()]);
+    const [items, bookItems, currentUser] = await Promise.all([getReviews(), getAdminBooks(), getCurrentUser()]);
     setReviews([...items].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)));
     setBooks(bookItems);
+    setUser(currentUser);
   }, []);
   useFocusEffect(useCallback(() => { load(); }, [load]));
   const bookMap = useMemo(() => Object.fromEntries(books.map((book) => [String(book.id), book])), [books]);
@@ -45,6 +45,22 @@ const router = useRouter();
     await updateReview(review.id, { status: next }, user?.api_token);
     setToast(next === 'hidden' ? 'Đã ẩn đánh giá.' : 'Đã khôi phục đánh giá.');
     load();
+  };
+
+  const remove = async () => {
+    if (pendingDelete) {
+      await deleteReview(pendingDelete.id, user?.api_token);
+      setToast('Đã xóa đánh giá vĩnh viễn.');
+      setPendingDelete(null);
+      load();
+    }
+  };
+
+  return (
+    <Screen>
+      <AdminHeader title="Quản lý Đánh giá" onBack={() => router.back()} />
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <AdminPageTitle title="Đánh giá từ người dùng" subtitle="Kiểm duyệt và quản lý phản hồi" />
         <AdminSearchFilter value={query} onChangeText={setQuery} placeholder="Tìm người viết, truyện hoặc nội dung...">
           {['all', '5', '4', '3', '2', '1'].map((item) => <FilterChip key={item} label={item === 'all' ? 'Mọi số sao' : `${item} sao`} active={rating === item} onPress={() => setRating(item)} />)}
         {[['all', 'Mọi trạng thái'], ['approved', 'Hiển thị'], ['hidden', 'Đã ẩn']].map(([value, label]) => <FilterChip key={value} label={label} active={status === value} onPress={() => setStatus(value)} />)}
