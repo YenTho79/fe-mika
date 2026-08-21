@@ -707,3 +707,92 @@ export async function updateTransactionStatusApi(txId, status, token) {
   }
 }
 
+/**
+ * Fetch reviews: GET /api/reviews/?bookId=:bookId
+ * @param {number|string|null} bookId
+ * @returns {Promise<{success: boolean, results?: Array, message?: string}>}
+ */
+export async function fetchReviewsApi(bookId = null) {
+  try {
+    const url = bookId ? `${API_BASE_URL}/reviews/?bookId=${bookId}` : `${API_BASE_URL}/reviews/`;
+    const response = await fetchWithTimeout(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    return await safeParseJson(response);
+  } catch (error) {
+    console.error('API fetchReviewsApi error:', error);
+    return { success: false, message: error.message };
+  }
+}
+
+/**
+ * Create a review: POST /api/reviews/
+ * @param {object} reviewData
+ * @param {string} token
+ * @returns {Promise<{success: boolean, review?: object, message?: string}>}
+ */
+export async function createReviewApi(reviewData, token) {
+  try {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/reviews/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Token ${token}`,
+      },
+      body: JSON.stringify(reviewData),
+    });
+    return await safeParseJson(response);
+  } catch (error) {
+    console.error('API createReviewApi error:', error);
+    return { success: false, message: error.message };
+  }
+}
+
+/**
+ * Update a review: PUT/PATCH /api/reviews/:id/
+ * @param {number|string} reviewId
+ * @param {object} changes
+ * @param {string} token
+ * @returns {Promise<{success: boolean, review?: object, message?: string}>}
+ */
+export async function updateReviewApi(reviewId, changes, token) {
+  try {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/reviews/${reviewId}/`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Token ${token}`,
+      },
+      body: JSON.stringify(changes),
+    });
+    return await safeParseJson(response);
+  } catch (error) {
+    console.error('API updateReviewApi error:', error);
+    return { success: false, message: error.message };
+  }
+}
+
+/**
+ * Delete a review: DELETE /api/reviews/:id/
+ * @param {number|string} reviewId
+ * @param {string} token
+ * @returns {Promise<{success: boolean, message?: string}>}
+ */
+export async function deleteReviewApi(reviewId, token) {
+  try {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/reviews/${reviewId}/`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Token ${token}`,
+      },
+    });
+    return await safeParseJson(response);
+  } catch (error) {
+    console.error('API deleteReviewApi error:', error);
+    return { success: false, message: error.message };
+  }
+}

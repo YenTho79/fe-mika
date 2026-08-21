@@ -124,7 +124,7 @@ const mapBackendChapterToFrontend = (c, bookId) => {
     number: c.so_thu_tu_chuong || c.number || 0,
     title: c.tieu_de || c.title || '',
     content: c.noi_dung || c.content || '',
-    locked: c.co_khoa !== undefined ? Boolean(c.co_khoa) : Boolean(c.locked),
+    locked: c.is_unlocked ? false : (c.is_paid !== undefined ? Boolean(c.is_paid) : (c.is_free !== undefined ? Boolean(c.co_khoa && !c.is_free) : Boolean(c.co_khoa || c.locked))),
     coinPrice: c.xu_yeu_cau !== undefined ? Number(c.xu_yeu_cau) : Number(c.coinPrice || 0),
     publishedAt: c.publishedAt || '2025-01-01',
   };
@@ -782,7 +782,7 @@ export const purchaseChapter = async (userId, chapter) => {
           await localStorageService.set(STORAGE_KEYS.PURCHASED_CHAPTERS, purchasedItems);
         }
 
-        return { success: true, balance: currentUser.coinBalance };
+        return { success: true, balance: currentUser.coinBalance, user: currentUser };
       } else {
         if (res.message && (res.message.includes('không đủ') || res.message.includes('không đủ để mở khoá') || res.message.includes('Số dư xu không đủ'))) {
           return {
@@ -915,22 +915,28 @@ const mapReviewApiToLocal = (item) => ({
 
 export const getReviews = async (bookId = null) => {
   const result = await fetchReviewsApi(bookId);
-  return result?.success && result.results ? result.results.map(mapReviewApiToLocal) : [];
+  if (result && result.success === false) return [];
+  const reviews = Array.isArray(result) ? result : (result?.results || []);
+  return reviews.map(mapReviewApiToLocal);
 };
 export const addReview = async (reviewData, token) => {
   const result = await createReviewApi(reviewData, token);
-  if (result?.success) return mapReviewApiToLocal(result.data || result);
-  console.error("Lỗi thêm đánh giá", result);
-  return null;
+  if (result && result.success === false) {
+    console.error("Lỗi thêm đánh giá", result);
+    return null;
+  }
+  return mapReviewApiToLocal(result?.data || result);
 };
 export const deleteReview = async (id, token) => {
   return await deleteReviewApi(id, token);
 };
 export const updateReview = async (id, changes, token) => {
   const result = await updateReviewApi(id, changes, token);
-  if (result?.success) return mapReviewApiToLocal(result.data || result);
-  console.error("Lỗi cập nhật đánh giá", result);
-  return null;
+  if (result && result.success === false) {
+    console.error("Lỗi cập nhật đánh giá", result);
+    return null;
+  }
+  return mapReviewApiToLocal(result?.data || result);
 };
 export const hideReview = (id, token) => updateReview(id, { status: 'hidden' }, token);
 

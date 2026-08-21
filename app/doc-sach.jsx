@@ -143,6 +143,7 @@ export default function Reader() {
   const currentIndex = chapters.findIndex((item) => String(item.id) === String(chapterId));
   const chapter = chapters[currentIndex] || null;
   const nextChapter = chapters[currentIndex + 1] || null;
+  const isUnlocked = chapter ? (!chapter.locked || user?.isVip || purchasedIds.includes(String(chapter.id))) : true;
 
   // Sync reader theme with global app theme unless explicitly customized
   const activeThemeKey = settings.explicitTheme
@@ -195,8 +196,8 @@ export default function Reader() {
 
   const requestChapter = (target) => {
     if (!target) return;
-    const isUnlocked = target.price === 0 || user?.isVip || purchasedIds.includes(String(target.id));
-    if (isUnlocked) {
+    const targetUnlocked = !target.locked || user?.isVip || purchasedIds.includes(String(target.id));
+    if (targetUnlocked) {
       setChapterId(target.id);
       return;
     }
@@ -205,14 +206,15 @@ export default function Reader() {
 
   const handlePurchase = async () => {
     if (!pendingChapter || !user) return;
-    const res = await purchaseChapter(user.id, pendingChapter.id, pendingChapter.price);
+    const res = await purchaseChapter(user.id, pendingChapter);
     if (res.success) {
       setPurchasedIds((prev) => [...prev, String(pendingChapter.id)]);
-      setUser(res.user);
+      if (res.user) setUser(res.user);
       setChapterId(pendingChapter.id);
       setPendingChapter(null);
     } else {
-      Alert.alert('Thất bại', res.message || 'Không thể mua chương.');
+      Alert.alert('Lỗi', res.message || 'Không thể mở khóa chương.');
+      setPendingChapter(null);
     }
   };
 
@@ -282,24 +284,42 @@ export default function Reader() {
           <>
             <Text style={[styles.chapterNumber, { color: theme.text }]}>CHƯƠNG {chapter.number}</Text>
             <Text style={[styles.chapterTitle, { color: theme.text }]}>{chapter.title}</Text>
-            {contentParagraphs.map((paragraph, index) => (
-              <Text
-                key={`${chapter.id}-${index}`}
-                style={[
-                  styles.body,
-                  {
-                    color: theme.text,
-                    fontSize: settings.fontSize,
-                    lineHeight: settings.fontSize * settings.lineHeight,
-                    fontFamily: settings.fontFamily,
-                    textAlign: settings.textAlign,
-                  },
-                ]}
-              >
-                {paragraph}
-              </Text>
-            ))}
-            {atChapterEnd ? (
+            {isUnlocked ? (
+              contentParagraphs.map((paragraph, index) => (
+                <Text
+                  key={`${chapter.id}-${index}`}
+                  style={[
+                    styles.body,
+                    {
+                      color: theme.text,
+                      fontSize: settings.fontSize,
+                      lineHeight: settings.fontSize * settings.lineHeight,
+                      fontFamily: settings.fontFamily,
+                      textAlign: settings.textAlign,
+                    },
+                  ]}
+                >
+                  {paragraph}
+                </Text>
+              ))
+            ) : (
+              <View style={[styles.lockContainer, { backgroundColor: theme.surface }]}>
+                <View style={styles.lockIconCircle}>
+                  <Ionicons name="lock-closed" size={32} color={colors.warning} />
+                </View>
+                <Text style={[styles.lockTitle, { color: theme.text }]}>Chương Truyện Thu Phí</Text>
+                <Text style={[styles.lockMessage, { color: theme.text }]}>
+                  Đây là chương truyện giới hạn. Bạn cần dùng xu hoặc nâng cấp VIP để xem tiếp nội dung.
+                </Text>
+                <PrimaryButton 
+                  title={`Mở khóa bằng ${chapter.coinPrice || 0} xu`} 
+                  onPress={() => requestChapter(chapter)} 
+                  style={{ marginTop: spacing.md, width: '100%' }}
+                />
+              </View>
+            )}
+            
+            {isUnlocked && atChapterEnd ? (
               <View style={[styles.nextSuggestion, { backgroundColor: theme.surface }]}>
                 <Ionicons name="checkmark-circle" size={30} color={colors.tertiary} />
                 <Text style={[styles.nextTitle, { color: theme.text }]}>Bạn đã đọc hết chương {chapter.number}</Text>
@@ -386,7 +406,7 @@ export default function Reader() {
       <ConfirmDialog
         visible={Boolean(pendingChapter)}
         title="Mở khóa chương?"
-        message={pendingChapter ? `Dùng ${pendingChapter.price} xu để mở khóa "${pendingChapter.title}"?` : ''}
+        message={pendingChapter ? `Dùng ${pendingChapter.coinPrice} xu để mở khóa "${pendingChapter.title}"?` : ''}
         confirmText="Mở khóa"
         onConfirm={handlePurchase}
         onCancel={() => setPendingChapter(null)}
@@ -432,4 +452,8 @@ const getStyles = (colors) => StyleSheet.create({
   roundText: { ...typography.title, color: colors.primary },
   fontValue: { ...typography.title, color: colors.text, fontWeight: '800' },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginVertical: spacing.xs },
+  lockContainer: { alignItems: 'center', padding: spacing.xxl, borderRadius: radius.xl, marginVertical: spacing.xl },
+  lockIconCircle: { width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(255, 183, 77, 0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md },
+  lockTitle: { ...typography.title, marginBottom: spacing.xs },
+  lockMessage: { ...typography.body, textAlign: 'center', marginBottom: spacing.xl },
 });

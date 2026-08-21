@@ -42,14 +42,14 @@ const router = useRouter();
 
   const toggleVisibility = async (review) => {
     const next = review.status === 'hidden' ? 'approved' : 'hidden';
-    await updateReview(review.id, { status: next }, user?.api_token);
+    await updateReview(review.id, { status: next }, user?.token);
     setToast(next === 'hidden' ? 'Đã ẩn đánh giá.' : 'Đã khôi phục đánh giá.');
     load();
   };
 
   const remove = async () => {
     if (pendingDelete) {
-      await deleteReview(pendingDelete.id, user?.api_token);
+      await deleteReview(pendingDelete.id, user?.token);
       setToast('Đã xóa đánh giá vĩnh viễn.');
       setPendingDelete(null);
       load();

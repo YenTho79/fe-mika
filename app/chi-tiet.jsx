@@ -151,7 +151,7 @@ export default function BookDetail() {
     if (!user) return;
 
     if (editingReview) {
-      const updated = await updateReview(editingReview.id, { rating, content }, user.api_token);
+      const updated = await updateReview(editingReview.id, { rating, content }, user.token);
       if (updated) setReviews((current) => current.map((item) => item.id === updated.id ? updated : item));
 
     } else {
@@ -159,7 +159,7 @@ export default function BookDetail() {
         bookId: book.id,
         rating,
         content,
-      }, user.api_token);
+      }, user.token);
       if (created) setReviews((current) => [created, ...current]);
     }
     setComment('');
@@ -209,7 +209,7 @@ export default function BookDetail() {
     <Screen padded={false} safeAreaTop={false}>
       <AppHeader
         title="Chi tiết truyện"
-        onBack={() => router.back()}
+        onBack={() => router.canGoBack() ? router.back() : router.replace('/trang-chu')}
         rightIcon="share-social-outline"
         onRight={() => router.push({ pathname: '/chia-se', params: { bookId: book.id } })}
       />
@@ -288,7 +288,7 @@ export default function BookDetail() {
                     <View style={styles.reviewAvatar}><Text style={styles.reviewAvatarText}>{(review.userName || 'M').trim().charAt(0).toUpperCase()}</Text></View>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.reviewName}>{review.userName || 'Độc giả Mika'}</Text>
-                      <Text style={styles.reviewDate}>{formatDisplayDate(review.updatedAt || review.createdAt)}{review.updatedAt ? ' · Đã sửa' : ''}</Text>
+                      <Text style={styles.reviewDate}>{formatDisplayDate(review.updatedAt || review.createdAt)}{review.updatedAt && review.createdAt && new Date(review.updatedAt) - new Date(review.createdAt) > 1000 ? ' · Đã sửa' : ''}</Text>
                     </View>
                   </View>
                   <Text style={styles.reviewStars}>{'★'.repeat(review.rating)}</Text>
