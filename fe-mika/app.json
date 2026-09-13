@@ -1,0 +1,65 @@
+{
+  "expo": {
+    "name": "Mika",
+    "slug": "Mika-books-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "mikabooks",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0b1326"
+    },
+    "notification": {
+      "color": "#7C3AED",
+      "androidMode": "default"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.mika.books",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0b1326"
+      },
+      "permissions": [
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT"
+      ],
+      "package": "com.mika.books"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-status-bar",
+      [
+        "expo-notifications",
+        {
+          "color": "#7C3AED",
+          "sounds": []
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Cho phép Mika Books sử dụng Face ID để đăng nhập nhanh."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "bda7cd9e-05f2-4ebc-a5a3-2b3c7b27799d"
+      }
+    }
+  }
+}
