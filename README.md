@@ -117,8 +117,8 @@ Bạn có thể đăng nhập trải nghiệm ngay trên ứng dụng di động
 
 | Loại tài khoản | Email đăng nhập | Mật khẩu | Quyền hạn & Chức năng |
 | :--- | :--- | :--- | :--- |
-| **Độc giả (User)** | `user@mika.vn` | `12345678` | Đọc truyện, nạp xu MoMo/VNPay, mở khóa chương VIP, lưu tủ sách |
-| **Quản trị (Admin)** | `admin@mika.vn` | `12345678` | Toàn quyền truy cập **Admin Portal** trên app để quản lý sách, chương, doanh thu |
+| **Độc giả (User)** | `24050094@student.bdu.edu.vn` | `12345Qwert@#` | Đọc truyện, nạp xu MoMo/VNPay, mở khóa chương VIP, lưu tủ sách |
+| **Quản trị (Admin)** | `admin@mika.vn` | `admin123` | Toàn quyền truy cập **Admin Portal** trên app để quản lý sách, chương, doanh thu |
 
 ---
 
