@@ -1,7 +1,6 @@
 # 📚 MIKA BOOKS - ỨNG DỤNG ĐỌC SÁCH & TRUYỆN ONLINE TRÊN DI ĐỘNG
 
-> **Dự án:** Ứng dụng đọc sách và truyện trực tuyến  
-> **Thành viên thực hiện Frontend:** Nguyễn Thị Yến Thơ  
+> **Dự án:** Ứng dụng đọc sách và truyện trực tuyến    
 > **Nền tảng:** Mobile App (iOS / Android / Web)
 
 ---
